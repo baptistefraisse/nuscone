@@ -1,0 +1,17 @@
+archives/
+.venv/
+__pycache__/
+nuscone.egg-info/
+nuscone/__pycache__/
+
+*.png
+*.pdf
+
+Mult_twoanodes_allruns_5dot6.txt
+Mult_twoanodes_run19_20_21_22_24.txt
+Noise_twpnodes_allruns_5dot6.txt
+Noise_twpnodes_run19_20_21_22_24.txt
+
+moments.csv
+pnu_err.txt
+pnu.txt
