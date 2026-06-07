@@ -40,7 +40,7 @@ def main() -> None:
             energy_err=moments["energy_err"].to_numpy(),
             references=refs,
         )
-        savefig(fig, config.paths.output_dir / "figures" / "238U_SCONE_nubar.png")
+        savefig(fig, config.paths.output_dir / "figures" / "238U_SCONE_nubar.pdf")
 
         # sigma
 
@@ -51,7 +51,7 @@ def main() -> None:
             energy_err=moments["energy_err"].to_numpy(),
             references=refs,
         )
-        savefig(fig, config.paths.output_dir / "figures" / "238U_SCONE_sigma.png")
+        savefig(fig, config.paths.output_dir / "figures" / "238U_SCONE_sigma.pdf")
 
         # lambda regularization
 
@@ -59,7 +59,7 @@ def main() -> None:
             moments["energy"].to_numpy(),
             moments["lambda"].to_numpy(),
         )
-        savefig(fig, config.paths.output_dir / "figures" / "238U_SCONE_lambda.png")
+        savefig(fig, config.paths.output_dir / "figures" / "238U_SCONE_lambda.pdf")
 
         # pnu separated plots
 
@@ -71,7 +71,7 @@ def main() -> None:
         #         results["pnu"][idx],
         #         results["pnu_err"][idx],
         #     )
-        #     savefig(fig, config.paths.output_dir / "figures" / f"238U_SCONE_Pnu_{energy}MeV.png")
+        #     savefig(fig, config.paths.output_dir / "figures" / f"238U_SCONE_Pnu_{energy}MeV.pdf")
 
         # pnu same plot
 
@@ -87,7 +87,7 @@ def main() -> None:
             fig,
             config.paths.output_dir /
             "figures" /
-            "238U_SCONE_Pnu_triptych.png"
+            "238U_SCONE_Pnu_triptych.pdf"
         )
 
         # factorial moments
@@ -104,7 +104,7 @@ def main() -> None:
 
             savefig(
                 fig,
-                config.paths.output_dir / "figures" / f"238U_SCONE_f{order}.png",
+                config.paths.output_dir / "figures" / f"238U_SCONE_f{order}.pdf",
             )
 
 
