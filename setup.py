@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name="nuscone",
     version="0.1.0",
-    description="Neutron analysis for SCONE @ GANIL/NFS",
+    description="Neutron analysis for SCONE",
     packages=find_packages(include=["nuscone", "nuscone.*"]),
     install_requires=[
         "numpy",

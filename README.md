@@ -1,6 +1,6 @@
 # NUSCONE
 
-Neutron multiplicity analysis for SCONE @ GANIL/NFS
+Neutron multiplicity analysis for SCONE
 
 ## Installation
 

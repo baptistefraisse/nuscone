@@ -39,15 +39,22 @@ MODEL_STYLES = {
         "capthick": 2,
         "zorder": 2,
     },
+    # "JEFF": {
+    #     "color": "orange",
+    #     "marker": "o",
+    #     "markersize": 9,
+    #     "linewidth": 0,
+    #     "linestyle": "none",
+    #     "capsize": 6,
+    #     "elinewidth": 2,
+    #     "capthick": 2,
+    #     "zorder": 3,
+    # },
     "JEFF": {
         "color": "orange",
-        "marker": "o",
-        "markersize": 9,
-        "linewidth": 0,
-        "linestyle": "none",
-        "capsize": 6,
-        "elinewidth": 2,
-        "capthick": 2,
+        "marker": None,
+        "linewidth": 5,
+        "linestyle": "-",
         "zorder": 3,
     },
     "ENDF": {
@@ -226,12 +233,19 @@ def plot_nubar_publication(
     if references:
         if "JEFF" in references:
             ref = references["JEFF"]
-            errorbar_model(
+            # errorbar_model(
+            #     ax_up,
+            #     "JEFF",
+            #     ref["energy"],
+            #     ref["nubar"],
+            #     yerr=ref.get("nubar_err"),
+            #     label="JEFF-3.3",
+            # )
+            plot_model(
                 ax_up,
                 "JEFF",
                 ref["energy"],
                 ref["nubar"],
-                yerr=ref.get("nubar_err"),
                 label="JEFF-3.3",
             )
 
@@ -293,7 +307,7 @@ def plot_nubar_publication(
 
     ax_up.set_xlim(-0.5, 31.5)
     ax_up.set_ylim(2.25, 6.45)
-    ax_down.set_ylim(-6, 6)
+    ax_down.set_ylim(-7, 7)
 
     ax_down.set_xticks([0, 5, 10, 15, 20, 25, 30])
     ax_up.set_yticks([3, 4, 5, 6])
