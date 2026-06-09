@@ -103,3 +103,20 @@ def second_derivative_operator_limit_conditions(nmax: int) -> np.ndarray:
     D2[nmax - 2][nmax - 3] = 0.0
 
     return D2
+
+
+def numerical_jacobian(func, x, eps=1e-5):
+    x = np.asarray(x, dtype=float)
+    f0 = np.asarray(func(x), dtype=float)
+    J = np.zeros((f0.size, x.size))
+
+    for j in range(x.size):
+        dx = np.zeros_like(x)
+        dx[j] = eps * max(1.0, abs(x[j]))
+
+        fp = np.asarray(func(x + dx), dtype=float)
+        fm = np.asarray(func(x - dx), dtype=float)
+
+        J[:, j] = (fp - fm) / (2.0 * dx[j])
+
+    return J

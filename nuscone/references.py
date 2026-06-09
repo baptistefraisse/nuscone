@@ -84,4 +84,50 @@ def load_references(reference_dir: str | Path) -> dict:
         "nubar_err": frehaut[:, 2],
     }
 
+    # Multi-chance probabilities: GEF
+
+    multichance_gef = _loadtxt(
+        reference_dir / "gef" / "multichance_gef.txt"
+    )
+
+    refs["GEF_MULTICHANCE"] = {
+        "energy": multichance_gef[:, 0],
+        "p2": multichance_gef[:, 1],
+        "p3": multichance_gef[:, 2],
+        "p1": 100.0 - multichance_gef[:, 1] - multichance_gef[:, 2],
+    }
+
+    # Multi-chance probabilities: CGMF
+
+    multichance_cgmf = _loadtxt(
+        reference_dir / "cgmf" / "multichance_cgmf.txt"
+    )
+
+    refs["CGMF_MULTICHANCE"] = {
+        "energy": multichance_cgmf[:, 0],
+        "p2": multichance_cgmf[:, 1],
+        "p3": multichance_cgmf[:, 2],
+        "p1": 100.0 - multichance_cgmf[:, 1] - multichance_cgmf[:, 2],
+    }
+
+    # Pre-fission neutron energies from GEF
+
+    en_prefission_238u = _loadtxt(
+        reference_dir / "gef" / "en_prefission_238U.txt"
+    )
+
+    refs["EN_PREFISSION_238U"] = {
+        "energy": en_prefission_238u[:, 0],
+        "value": en_prefission_238u[:, 1],
+    }
+
+    en_prefission_237u = _loadtxt(
+        reference_dir / "gef" / "en_prefission_237U.txt"
+    )
+
+    refs["EN_PREFISSION_237U"] = {
+        "energy": en_prefission_237u[:, 0],
+        "value": en_prefission_237u[:, 1],
+    }
+
     return refs

@@ -4,6 +4,8 @@ from pathlib import Path
 from .config import load_config
 from .pipeline import run_analysis, save_results
 from .references import load_references
+from .multichance import extract_multichance_probabilities, MultiChanceConfig
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="NUSCONE neutron multiplicity unfolding")
@@ -23,6 +25,11 @@ def main() -> None:
             plot_lambda_publication,
             plot_pnu_triptych_publication,
             plot_moment_publication,
+            plot_multichance_probabilities,
+            plot_multichance_pnu_fit,
+            plot_multichance_moments,
+            plot_multichance_sigma,
+            plot_multichance_probabilities,
             savefig,
         )
 
@@ -106,6 +113,33 @@ def main() -> None:
                 fig,
                 config.paths.output_dir / "figures" / f"238U_SCONE_f{order}.pdf",
             )
+
+        # multichance fission
+
+        pnu_path = Path("results/tables/pnu.txt")
+        multichance_dir = Path("results/tables")
+
+        multichance = extract_multichance_probabilities(
+            pnu_path=pnu_path,
+            output_dir=multichance_dir,
+            cfg=MultiChanceConfig(),
+        )
+
+        fig, _ = plot_multichance_pnu_fit(
+            multichance,
+            config.paths.output_dir / "tables" / "pnu.txt",
+            chosen_index=9,
+        )
+        savefig(fig, config.paths.output_dir / "figures" / "238U_SCONE_multichance_pnu_fit.pdf")
+
+        fig, _ = plot_multichance_moments(multichance)
+        savefig(fig, config.paths.output_dir / "figures" / "238U_SCONE_multichance_nubar_check.pdf")
+
+        fig, _ = plot_multichance_sigma(multichance)
+        savefig(fig, config.paths.output_dir / "figures" / "238U_SCONE_multichance_sigma_check.pdf")
+
+        fig, _ = plot_multichance_probabilities(multichance)
+        savefig(fig, config.paths.output_dir / "figures" / "238U_SCONE_multichance_probabilities.pdf")
 
 
 if __name__ == "__main__":

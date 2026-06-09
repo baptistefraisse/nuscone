@@ -3,6 +3,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import gridspec
+from .multichance import model_components, read_pnu_table, MultiChanceConfig, load_multichance_reference_data
+from .references import load_references
 
 
 MODEL_STYLES = {
@@ -604,6 +606,301 @@ def plot_pnu_triptych_publication(
         bottom=0.18,
         top=0.82,
         wspace=0.05,
+    )
+
+    return fig, axes
+
+
+def plot_multichance_pnu_fit(df, pnu_path, chosen_index=9, cfg=None):
+    setup_publication_style()
+
+    if cfg is None:
+        cfg = MultiChanceConfig()
+
+    if len(cfg.en_prefission_238U) == 0 or len(cfg.en_prefission_237U) == 0:
+        en_prefission_238u, en_prefission_237u = load_multichance_reference_data(cfg)
+        cfg.en_prefission_238U = en_prefission_238u
+        cfg.en_prefission_237U = en_prefission_237u
+
+    energy, pnu = read_pnu_table(pnu_path)
+    pnu = pnu[:len(df)]
+
+    cfg.nmax = pnu.shape[1]
+
+    row = df.iloc[chosen_index]
+    n, c1, c2, c3, total = model_components(
+        row["energy"], chosen_index, row["p2"], row["p3"], cfg
+    )
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    plot_model(
+        ax,
+        "SCONE",
+        n,
+        pnu[chosen_index],
+        label="SCONE",
+        linestyle="",
+        linewidth=0,
+        markersize=10,
+    )
+
+    ax.plot(n, total, color="dimgrey", linestyle="-", linewidth=4, label="Total")
+    ax.plot(n, c1, color="grey", linestyle="-", linewidth=3, label="First chance")
+    ax.plot(n, c2, color="darkgrey", linestyle="--", linewidth=3, label="Second chance")
+    ax.plot(n, c3, color="silver", linestyle=":", linewidth=3, label="Third chance")
+
+    ax.set_xlabel("Neutron multiplicity", fontsize=PLOT_STYLE["label_size"])
+    ax.set_ylabel("Probability", fontsize=PLOT_STYLE["label_size"])
+    ax.set_xlim(-0.5, cfg.nmax - 0.5)
+    ax.set_ylim(-0.02, 0.40)
+    ax.set_xticks([0, 5, 10])
+    ax.set_yticks([0.0, 0.1, 0.2, 0.3, 0.4])
+
+    ax.legend(
+        loc="upper right",
+        frameon=False,
+        fontsize=PLOT_STYLE["label_size"],
+        handlelength=1.6,
+        borderpad=0.2,
+        labelspacing=0.4,
+        title=f"{row['energy']:.1f} MeV",
+        title_fontsize=PLOT_STYLE["label_size"]
+    )
+
+    polish_axes(ax)
+    fig.tight_layout()
+
+    return fig, ax
+
+
+def plot_multichance_moments(df):
+    setup_publication_style()
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    errorbar_model(
+        ax,
+        "SCONE",
+        df["energy"],
+        df["nubar_exp"],
+        label="SCONE",
+        linestyle="none",
+        linewidth=2,
+        markersize=7,
+        capsize=3,
+        zorder=10,
+    )
+
+    ax.plot(
+        df["energy"],
+        df["nubar_fit"],
+        color=_style("SCONE")["color"],
+        linestyle="-",
+        linewidth=3,
+        label="Multi-chance fit",
+        zorder=8,
+    )
+
+    ax.set_xlabel(
+        "Incident neutron energy (MeV)",
+        fontsize=PLOT_STYLE["label_size"],
+    )
+    ax.set_ylabel(
+        "Average neutron multiplicity",
+        fontsize=PLOT_STYLE["label_size"],
+    )
+
+    ax.set_xlim(0, 21)
+
+    ax.legend(
+        loc="upper left",
+        frameon=False,
+        fontsize=PLOT_STYLE["legend_size"],
+        handlelength=1.6,
+        borderpad=0.2,
+        labelspacing=0.4,
+    )
+
+    polish_axes(ax)
+    fig.tight_layout()
+
+    return fig, ax
+
+
+def plot_multichance_sigma(df):
+    setup_publication_style()
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    errorbar_model(
+        ax,
+        "SCONE",
+        df["energy"],
+        df["sigma_exp"],
+        label="SCONE",
+        linestyle="none",
+        linewidth=2,
+        markersize=7,
+        capsize=3,
+        zorder=10,
+    )
+
+    ax.plot(
+        df["energy"],
+        df["sigma_fit"],
+        color=_style("SCONE")["color"],
+        linestyle="-",
+        linewidth=3,
+        label="Multi-chance fit",
+        zorder=8,
+    )
+
+    ax.set_xlabel(
+        "Incident neutron energy (MeV)",
+        fontsize=PLOT_STYLE["label_size"],
+    )
+    ax.set_ylabel(
+        "Neutron multiplicity standard deviation",
+        fontsize=PLOT_STYLE["label_size"],
+    )
+
+    ax.set_xlim(0, 21)
+
+    ax.legend(
+        loc="upper left",
+        frameon=False,
+        fontsize=PLOT_STYLE["legend_size"],
+        handlelength=1.6,
+        borderpad=0.2,
+        labelspacing=0.4,
+    )
+
+    polish_axes(ax)
+    fig.tight_layout()
+
+    return fig, ax
+
+def plot_multichance_probabilities(df, reference_dir=Path("data/references")):
+    
+    setup_publication_style()
+
+    refs = load_references(reference_dir)
+
+    gef_ref = refs["GEF_MULTICHANCE"]
+    cgmf_ref = refs["CGMF_MULTICHANCE"]
+
+    fig, axes = plt.subplots(
+        1,
+        3,
+        figsize=(14.5, 5.2),
+        sharey=True,
+        constrained_layout=False,
+    )
+
+    panel_labels = ["First chance", "Second chance", "Third chance"]
+    scone_cols = ["p1", "p2", "p3"]
+
+    e_gef = gef_ref["energy"]
+    e_cgmf = cgmf_ref["energy"]
+
+    gef = [
+        gef_ref["p1"],
+        gef_ref["p2"],
+        gef_ref["p3"],
+    ]
+
+    cgmf = [
+        cgmf_ref["p1"],
+        cgmf_ref["p2"],
+        cgmf_ref["p3"],
+    ]
+
+    for i, (ax, text, col, gef_i, cgmf_i) in enumerate(
+        zip(axes, panel_labels, scone_cols, gef, cgmf)
+    ):
+
+        plot_model(
+            ax,
+            "GEF",
+            e_gef,
+            gef_i,
+            label="GEF" if i == 2 else None,
+            linewidth=4,
+        )
+
+        plot_model(
+            ax,
+            "CGMF",
+            e_cgmf,
+            cgmf_i,
+            label="CGMF" if i == 2 else None,
+            linewidth=4,
+        )
+
+        err_col = "d" + col
+
+        errorbar_model(
+            ax,
+            "SCONE",
+            df["energy"],
+            df[col],
+            yerr=df[err_col] if err_col in df.columns else None,
+            label="SCONE" if i == 2 else None,
+            linewidth=2,
+            markersize=6,
+            capsize=3,
+        )
+
+        ax.text(
+            0.8,
+            1.1,
+            text,
+            transform=ax.transAxes,
+            ha="right",
+            va="top",
+            fontsize=PLOT_STYLE["label_size"],
+        )
+
+        ax.set_xlim(0, 21)
+        ax.set_ylim(-5, 110)
+
+        ax.set_xticks([5, 10, 15])
+        ax.set_yticks([0, 25, 50, 75, 100])
+
+        polish_axes(
+            ax,
+            tick_size=PLOT_STYLE["label_size"],
+            spine_width=3,
+        )
+
+    axes[0].set_ylabel(
+        "Fission probability (%)",
+        fontsize=PLOT_STYLE["label_size"],
+        labelpad=20,
+    )
+
+    axes[2].legend(
+        loc="upper left",
+        frameon=False,
+        fontsize=PLOT_STYLE["font_size"]-2,
+        handlelength=1.6,
+        borderpad=0.2,
+        labelspacing=0.4,
+    )
+
+    fig.supxlabel(
+        "Incident neutron energy (MeV)",
+        fontsize=PLOT_STYLE["label_size"],
+        y=0.04,
+    )
+
+    fig.subplots_adjust(
+        left=0.10,
+        right=0.98,
+        bottom=0.18,
+        top=0.95,
+        wspace=0.1,
     )
 
     return fig, axes

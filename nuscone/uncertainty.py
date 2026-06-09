@@ -1,5 +1,6 @@
 import numpy as np
-
+from .operators import numerical_jacobian
+from .multichance import _global_objective, _decode_probabilities
 
 def mean_error(p, p_err=None, n_events=None):
     nu = np.arange(len(p))
@@ -58,3 +59,4 @@ def propagate_distribution_errors(A, D, lambda_reg, y, n_events):
     covariance_x = A_hash @ covariance_y @ A_hash.T
 
     return np.sqrt(np.maximum(np.diag(covariance_x), 0.0))
+
