@@ -130,4 +130,21 @@ def load_references(reference_dir: str | Path) -> dict:
         "value": en_prefission_237u[:, 1],
     }
 
+    en_prefission_236u = _loadtxt(
+        reference_dir / "gef" / "en_prefission_236U.txt"
+    )
+
+    refs["EN_PREFISSION_236U"] = {
+        "energy": en_prefission_236u[:, 0],
+        "value": en_prefission_236u[:, 1],
+    }
+
+    # 252Cf B3 model (delta_TKE)
+    cf252 = _loadtxt(reference_dir / "b3" / "252Cf.txt")
+    cf252 = np.atleast_2d(cf252)
+    refs["CF252_B3"] = {
+        "E_exc":     cf252[:, 0],
+        "delta_TKE": cf252[:, 1],
+    }
+
     return refs

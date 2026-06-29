@@ -611,16 +611,95 @@ def plot_pnu_triptych_publication(
     return fig, axes
 
 
+def plot_pnu_3d(energies, pnu, figsize=(12, 9)):
+    from matplotlib.colors import LinearSegmentedColormap
+
+    biopunk_cmap = LinearSegmentedColormap.from_list(
+        "biopunk",
+        ["#000814", "#0a1628", "#0f4c0f", "#1a8a1a", "#39ff14", "#b8ff47", "#ffffff"],
+    )
+
+    fig = plt.figure(figsize=figsize, facecolor="#000814")
+    ax = fig.add_subplot(111, projection="3d")
+    ax.set_facecolor("#000814")
+
+    nmax = pnu.shape[1]
+    nu = np.arange(nmax)
+    NU, EN = np.meshgrid(nu, energies)
+
+    norm = plt.Normalize(vmin=0.0, vmax=float(pnu.max()))
+
+    ax.plot_surface(
+        NU, EN, pnu,
+        cmap=biopunk_cmap,
+        norm=norm,
+        rstride=1,
+        cstride=1,
+        linewidth=0,
+        antialiased=True,
+        shade=True,
+        alpha=0.92,
+    )
+
+    ax.plot_wireframe(
+        NU, EN, pnu,
+        color="#39ff14",
+        linewidth=0.2,
+        alpha=0.18,
+        rstride=3,
+        cstride=2,
+    )
+
+    neon = "#c77dff"
+
+    ax.set_xlabel(r"$\nu$", fontsize=PLOT_STYLE["font_size"], labelpad=16, color=neon)
+    ax.set_ylabel(r"$E_n$ (MeV)", fontsize=PLOT_STYLE["font_size"], labelpad=40, color=neon)
+    # ax.set_zlabel(r"$P(\nu)$", fontsize=PLOT_STYLE["label_size"], labelpad=4, color=neon)
+
+    ax.set_xlim(0, nmax - 1)
+    ax.set_ylim(energies.min(), energies.max())
+    ax.set_zlim(0.0, float(pnu.max()) * 1.1)
+
+    ax.set_xticks([0, 5, 10])
+    ax.set_yticks([5, 10, 15, 20, 25, 30])
+    ax.set_zticks([])
+
+    ax.tick_params(labelsize=PLOT_STYLE["tick_size"] - 4, pad=1, colors=neon)
+
+    ax.view_init(elev=28, azim=-50)
+    ax.set_box_aspect([1.2, 3.0, 1.0])
+
+    for pane in [ax.xaxis.pane, ax.yaxis.pane, ax.zaxis.pane]:
+        pane.fill = True
+        pane.set_facecolor("#000e06")
+        pane.set_edgecolor("#0a3318")
+
+    ax.grid(True, color="#0a2211", linewidth=0.4, alpha=0.6)
+
+    ax.set_position([0.0, 0.02, 0.5, 0.96])
+    return fig, ax
+
+
+# multichance plots
+
+
 def plot_multichance_pnu_fit(df, pnu_path, chosen_index=9, cfg=None):
     setup_publication_style()
 
     if cfg is None:
         cfg = MultiChanceConfig()
 
-    if len(cfg.en_prefission_238U) == 0 or len(cfg.en_prefission_237U) == 0:
-        en_prefission_238u, en_prefission_237u = load_multichance_reference_data(cfg)
+    if (
+        len(cfg.en_prefission_238U) == 0
+        or len(cfg.en_prefission_237U) == 0
+        # or len(cfg.en_prefission_236U) == 0
+    ):
+        en_prefission_238u, en_prefission_237u = ( #en_prefission_236u
+            load_multichance_reference_data(cfg)
+        )
         cfg.en_prefission_238U = en_prefission_238u
         cfg.en_prefission_237U = en_prefission_237u
+        # cfg.en_prefission_236U = en_prefission_236u
 
     energy, pnu = read_pnu_table(pnu_path)
     pnu = pnu[:len(df)]
@@ -628,8 +707,14 @@ def plot_multichance_pnu_fit(df, pnu_path, chosen_index=9, cfg=None):
     cfg.nmax = pnu.shape[1]
 
     row = df.iloc[chosen_index]
-    n, c1, c2, c3, total = model_components(
-        row["energy"], chosen_index, row["p2"], row["p3"], cfg
+
+    n, c1, c2, c3, total = model_components( # c4
+        row["energy"],
+        chosen_index,
+        row["p2"],
+        row["p3"],
+        #row["p4"],
+        cfg,
     )
 
     fig, ax = plt.subplots(figsize=(10, 10))
@@ -649,6 +734,7 @@ def plot_multichance_pnu_fit(df, pnu_path, chosen_index=9, cfg=None):
     ax.plot(n, c1, color="grey", linestyle="-", linewidth=3, label="First chance")
     ax.plot(n, c2, color="darkgrey", linestyle="--", linewidth=3, label="Second chance")
     ax.plot(n, c3, color="silver", linestyle=":", linewidth=3, label="Third chance")
+    #ax.plot(n, c4, color="lightgrey", linestyle="-.", linewidth=3, label="Fourth chance")
 
     ax.set_xlabel("Neutron multiplicity", fontsize=PLOT_STYLE["label_size"])
     ax.set_ylabel("Probability", fontsize=PLOT_STYLE["label_size"])
@@ -665,7 +751,7 @@ def plot_multichance_pnu_fit(df, pnu_path, chosen_index=9, cfg=None):
         borderpad=0.2,
         labelspacing=0.4,
         title=f"{row['energy']:.1f} MeV",
-        title_fontsize=PLOT_STYLE["label_size"]
+        title_fontsize=PLOT_STYLE["label_size"],
     )
 
     polish_axes(ax)
@@ -711,7 +797,7 @@ def plot_multichance_moments(df):
         fontsize=PLOT_STYLE["label_size"],
     )
 
-    ax.set_xlim(0, 21)
+    ax.set_xlim(0, 19)
 
     ax.legend(
         loc="upper left",
@@ -765,7 +851,7 @@ def plot_multichance_sigma(df):
         fontsize=PLOT_STYLE["label_size"],
     )
 
-    ax.set_xlim(0, 21)
+    ax.set_xlim(0, 19)
 
     ax.legend(
         loc="upper left",
@@ -782,7 +868,7 @@ def plot_multichance_sigma(df):
     return fig, ax
 
 def plot_multichance_probabilities(df, reference_dir=Path("data/references")):
-    
+
     setup_publication_style()
 
     refs = load_references(reference_dir)
@@ -792,14 +878,20 @@ def plot_multichance_probabilities(df, reference_dir=Path("data/references")):
 
     fig, axes = plt.subplots(
         1,
-        3,
+        3, # 4, 5 for higher chances ...
         figsize=(14.5, 5.2),
         sharey=True,
         constrained_layout=False,
     )
 
-    panel_labels = ["First chance", "Second chance", "Third chance"]
-    scone_cols = ["p1", "p2", "p3"]
+    panel_labels = [
+        "First chance",
+        "Second chance",
+        "Third chance",
+        #"Fourth chance",
+    ]
+
+    scone_cols = ["p1", "p2", "p3"] #, "p4"]
 
     e_gef = gef_ref["energy"]
     e_cgmf = cgmf_ref["energy"]
@@ -808,12 +900,14 @@ def plot_multichance_probabilities(df, reference_dir=Path("data/references")):
         gef_ref["p1"],
         gef_ref["p2"],
         gef_ref["p3"],
+        #gef_ref["p4"] if "p4" in gef_ref else np.zeros_like(e_gef),
     ]
 
     cgmf = [
         cgmf_ref["p1"],
         cgmf_ref["p2"],
         cgmf_ref["p3"],
+        #cgmf_ref["p4"] if "p4" in cgmf_ref else np.zeros_like(e_cgmf),
     ]
 
     for i, (ax, text, col, gef_i, cgmf_i) in enumerate(
@@ -838,34 +932,34 @@ def plot_multichance_probabilities(df, reference_dir=Path("data/references")):
             linewidth=4,
         )
 
-        err_col = "d" + col
+        err_low_col = "d" + col + "_low"
+        err_up_col  = "d" + col + "_up"
+        if err_low_col in df.columns and err_up_col in df.columns:
+            yerr = [df[err_low_col][:17].to_numpy(), df[err_up_col][:17].to_numpy()]
+        elif "d" + col in df.columns:
+            yerr = df["d" + col][:17].to_numpy()
+        else:
+            yerr = None
 
         errorbar_model(
             ax,
             "SCONE",
-            df["energy"],
-            df[col],
-            yerr=df[err_col] if err_col in df.columns else None,
+            df["energy"][:17],
+            df[col][:17],
+            yerr=yerr,
             label="SCONE" if i == 2 else None,
             linewidth=2,
             markersize=6,
             capsize=3,
+            zorder=10,
         )
 
-        ax.text(
-            0.8,
-            1.1,
-            text,
-            transform=ax.transAxes,
-            ha="right",
-            va="top",
-            fontsize=PLOT_STYLE["label_size"],
-        )
+        ax.set_title(text, fontsize=PLOT_STYLE["label_size"], pad=10)
 
-        ax.set_xlim(0, 21)
+        ax.set_xlim(0, 19)
         ax.set_ylim(-5, 110)
 
-        ax.set_xticks([5, 10, 15])
+        ax.set_xticks([5,10,15])
         ax.set_yticks([0, 25, 50, 75, 100])
 
         polish_axes(
@@ -883,7 +977,7 @@ def plot_multichance_probabilities(df, reference_dir=Path("data/references")):
     axes[2].legend(
         loc="upper left",
         frameon=False,
-        fontsize=PLOT_STYLE["font_size"]-2,
+        fontsize=PLOT_STYLE["font_size"] - 2,
         handlelength=1.6,
         borderpad=0.2,
         labelspacing=0.4,
@@ -892,15 +986,64 @@ def plot_multichance_probabilities(df, reference_dir=Path("data/references")):
     fig.supxlabel(
         "Incident neutron energy (MeV)",
         fontsize=PLOT_STYLE["label_size"],
-        y=0.04,
+        #y=0.04,
     )
 
     fig.subplots_adjust(
-        left=0.10,
-        right=0.98,
+        left=0.08,
+        right=0.99,
         bottom=0.18,
-        top=0.95,
-        wspace=0.1,
+        top=0.88,
+        wspace=0.08,
     )
 
     return fig, axes
+
+
+def plot_multichance_excitation_sigma(df, refs=None, sn_en_cf252=8.5, sn_en_cf252_err=0.5, emax=18, figsize=(10, 10)):
+    setup_publication_style()
+    fig, ax = plt.subplots(figsize=figsize)
+
+    mask = df["energy"].to_numpy() <= emax
+    E_exc = df["E_exc"].to_numpy()[mask]
+    dE_exc = df["dE_exc"].to_numpy()[mask] if "dE_exc" in df.columns else None
+    sigma_exp = df["sigma_exp"].to_numpy()[mask]
+    sigma_err  = df["sigma_err"].to_numpy()[mask] if "sigma_err" in df.columns else None
+
+    if refs is not None and "CF252_B3" in refs:
+        from .models import delta_tke_to_sigma, delta_tke_to_sigma_err
+        E_exc_cf = refs["CF252_B3"]["E_exc"]
+        dtke = refs["CF252_B3"]["delta_TKE"]
+        sigma_cf = delta_tke_to_sigma(dtke, sn_en_cf252)
+        sigma_cf_err = delta_tke_to_sigma_err(dtke, sn_en_cf252, sn_en_cf252_err)
+        ax.errorbar(E_exc_cf, sigma_cf, yerr=sigma_cf_err,
+                    fmt="o", color="teal", markersize=12,
+                    elinewidth=3, capsize=5, capthick=3, zorder=12,
+                    label=r"Microscopic calculation $^{252}$Cf")
+
+    errorbar_model(
+        ax, "SCONE", E_exc, sigma_exp,
+        xerr=dE_exc, yerr=sigma_err,
+        label="SCONE", linestyle="none",
+        linewidth=2, markersize=7, capsize=3, zorder=10,
+    )
+
+    ax.set_xlabel(
+        r"Excitation energy (MeV)",
+        fontsize=PLOT_STYLE["label_size"],
+    )
+    ax.set_ylabel(
+        r"Neutron multiplicity standard-deviation",
+        fontsize=PLOT_STYLE["label_size"],
+    )
+    ax.legend(loc="upper left", frameon=False,
+              fontsize=PLOT_STYLE["legend_size"],
+              handlelength=1.6, borderpad=0.2, labelspacing=0.4)
+
+    polish_axes(ax)
+    fig.tight_layout()
+    ax.set_ylim(0.8,1.6)
+    ax.set_xlim(-0.5,20.5)
+    ax.set_xticks([0,5,10,15,20])
+    ax.set_yticks([1.0, 1.2, 1.4])
+    return fig, ax

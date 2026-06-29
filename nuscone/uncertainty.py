@@ -2,27 +2,38 @@ import numpy as np
 from .operators import numerical_jacobian
 from .multichance import _global_objective, _decode_probabilities
 
-def mean_error(p, p_err=None, n_events=None):
+def mean_error(p, cov_p=None, p_err=None, n_events=None):
     nu = np.arange(len(p))
-    nubar = np.sum(nu * p)
-    sigma = np.sqrt(np.sum(p * (nu - nubar)**2))
+    grad = nu
+
+    if cov_p is not None:
+        err2 = grad @ cov_p @ grad
+        return np.sqrt(max(err2, 0.0))
+
     err2 = 0.0
     if p_err is not None:
-        err2 += np.sum((nu * p_err)**2)
+        err2 += np.sum((grad * p_err)**2)
     if n_events is not None and n_events > 0:
+        sigma = np.sqrt(np.sum(p * (nu - np.sum(nu*p))**2))
         err2 += sigma**2 / n_events
+
     return np.sqrt(err2)
 
 
-def sigma_error(p, p_err=None, n_events=None):
+def sigma_error(p, cov_p=None, p_err=None, n_events=None):
     nu = np.arange(len(p))
     nubar = np.sum(nu * p)
     sigma = np.sqrt(np.sum(p * (nu - nubar)**2))
 
+    grad = ((nu - nubar)**2 - sigma**2) / (2 * sigma)
+
+    if cov_p is not None:
+        err2 = grad @ cov_p @ grad
+        return np.sqrt(max(err2, 0.0))
+
     err2 = 0.0
 
     if p_err is not None:
-        grad = ((nu - nubar)**2 - sigma**2) / (2 * sigma)
         err2 += np.sum((grad * p_err)**2)
 
     if n_events is not None and n_events > 0:
@@ -31,15 +42,36 @@ def sigma_error(p, p_err=None, n_events=None):
     return np.sqrt(err2)
 
 
-def f2_error(p, p_err):
+def f2_error(p, cov_p=None, p_err=None):
     nu = np.arange(len(p))
     grad = nu * (nu - 1)
+
+    if cov_p is not None:
+        err2 = grad @ cov_p @ grad
+        return np.sqrt(max(err2, 0.0))
+
     return np.sqrt(np.sum((grad * p_err)**2))
 
 
-def f3_error(p, p_err):
+def f3_error(p, cov_p=None, p_err=None):
     nu = np.arange(len(p))
     grad = nu * (nu - 1) * (nu - 2)
+
+    if cov_p is not None:
+        err2 = grad @ cov_p @ grad
+        return np.sqrt(max(err2, 0.0))
+
+    return np.sqrt(np.sum((grad * p_err)**2))
+
+
+def f4_error(p, cov_p=None, p_err=None):
+    nu = np.arange(len(p))
+    grad = nu * (nu - 1) * (nu - 2) * (nu - 3)
+
+    if cov_p is not None:
+        err2 = grad @ cov_p @ grad
+        return np.sqrt(max(err2, 0.0))
+
     return np.sqrt(np.sum((grad * p_err)**2))
 
 
@@ -58,5 +90,5 @@ def propagate_distribution_errors(A, D, lambda_reg, y, n_events):
 
     covariance_x = A_hash @ covariance_y @ A_hash.T
 
-    return np.sqrt(np.maximum(np.diag(covariance_x), 0.0))
+    return covariance_x
 

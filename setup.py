@@ -11,6 +11,7 @@ setup(
         "pandas",
         "matplotlib",
         "pyyaml",
+        "tqdm",
     ],
     extras_require={
         "dev": [

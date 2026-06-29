@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from copy import deepcopy
 from scipy.optimize import minimize
+from tqdm import tqdm
 
 from .models import gaussian, linear_model, raised_cosine
 from .references import load_references
@@ -14,7 +15,7 @@ from .references import load_references
 
 @dataclass
 class MultiChanceConfig:
-    
+
     reference_dir: Path = Path("data/references")
 
     nmax: int = 10
@@ -29,20 +30,26 @@ class MultiChanceConfig:
     c_237U: float = 0.02
     d_237U: float = 1.09
 
-    a_236U: float = 0.13
+    a_236U: float = 0.11
     b_236U: float = 2.5
     c_236U: float = 0.02
     d_236U: float = 1.09
 
-    Sn_239U: float = 4.9
-    Sn_238U: float = 6.2
+    # a_235U: float = 0.13
+    # b_235U: float = 2.5
+    # c_235U: float = 0.02
+    # d_235U: float = 1.09
+
+    Sn_239U: float = 4.9 # LANL data
+    Sn_238U: float = 6.2 # LANL data
+    Sn_237U: float = 5.0 # LANL data
 
     grid_step_percent: float = 1.0
 
-    w_shape: float = 0.0   # 0
-    w_nubar: float = 150   # 150
-    w_sigma: float = 1000  # 1000
-    w_smooth: float = 1.0  # 1
+    w_shape: float  = 1e0    # 1e4
+    w_nubar: float  = 1e0    # 1e3
+    w_sigma: float  = 1e1    # 1e4
+    w_smooth: float = 3e-2   # 1e1
 
     b_min: float = 2.45
     b_max: float = 2.55
@@ -58,14 +65,19 @@ class MultiChanceConfig:
         default_factory=lambda: np.array([])
     )
 
+    # en_prefission_236U: np.ndarray = field(
+    #     default_factory=lambda: np.array([])
+    # )
+
 
 def load_multichance_reference_data(cfg: MultiChanceConfig):
     refs = load_references(cfg.reference_dir)
 
     en_prefission_238u = refs["EN_PREFISSION_238U"]["value"]
     en_prefission_237u = refs["EN_PREFISSION_237U"]["value"]
+    # en_prefission_236u = refs["EN_PREFISSION_236U"]["value"]
 
-    return en_prefission_238u, en_prefission_237u
+    return en_prefission_238u, en_prefission_237u #, en_prefission_236u
 
 
 def read_pnu_table(path: Path) -> tuple[np.ndarray, np.ndarray]:
@@ -91,7 +103,7 @@ def calibrate_first_chance_parameters(
     energy: np.ndarray,
     pnu: np.ndarray,
     cfg: MultiChanceConfig,
-    emax: float = 4.0,
+    emax: float = 5.0,
 ) -> MultiChanceConfig:
     nubar_exp, sigma_exp = distribution_moments(pnu)
 
@@ -107,9 +119,11 @@ def calibrate_first_chance_parameters(
 
     cfg.b_237U = cfg.b_238U
     cfg.b_236U = cfg.b_238U
+    # cfg.b_235U = cfg.b_238U
 
     cfg.c_237U = cfg.c_238U
     cfg.c_236U = cfg.c_238U
+    # cfg.c_235U = cfg.c_238U
 
     print("First-chance calibration:")
     print(f"a_238U={cfg.a_238U:.6f}")
@@ -127,9 +141,13 @@ def _component_parameters(E: float, i: int, cfg: MultiChanceConfig):
 
     if len(cfg.en_prefission_237U) == 0:
         raise RuntimeError("Pre-fission energies not loaded.")
+
+    # if len(cfg.en_prefission_236U) == 0:
+    #     raise RuntimeError("Pre-fission energies not loaded.")
     
     en1 = cfg.en_prefission_238U[i]
     en2 = cfg.en_prefission_237U[i]
+    # en3 = cfg.en_prefission_236U[i]
 
     b = cfg.b_238U
     c = cfg.c_238U
@@ -137,20 +155,24 @@ def _component_parameters(E: float, i: int, cfg: MultiChanceConfig):
     E1 = E
     E2 = E - cfg.Sn_239U - en1
     E3 = E - cfg.Sn_239U - en1 - cfg.Sn_238U - en2
+    # E4 = E - cfg.Sn_239U - en1 - cfg.Sn_238U - en2 - cfg.Sn_237U - en3
 
     nubar1 = linear_model(E1, cfg.a_238U, b)
     nubar2 = linear_model(E2, cfg.a_237U, b)
     nubar3 = linear_model(E3, cfg.a_236U, b)
+    # nubar4 = linear_model(E4, cfg.a_235U, b)
 
     sigma1 = linear_model(E1, c, cfg.d_238U)
     sigma2 = linear_model(E2, c, cfg.d_237U)
     sigma3 = linear_model(E3, c, cfg.d_236U)
+    # sigma4 = linear_model(E4, c, cfg.d_235U)
 
     sigma1 = max(float(sigma1), cfg.sigma_min)
     sigma2 = max(float(sigma2), cfg.sigma_min)
     sigma3 = max(float(sigma3), cfg.sigma_min)
+    # sigma4 = max(float(sigma4), cfg.sigma_min)
 
-    return nubar1, sigma1, nubar2, sigma2, nubar3, sigma3
+    return nubar1, sigma1, nubar2, sigma2, nubar3, sigma3 #, nubar4, sigma4
 
 
 def model_components(
@@ -158,50 +180,64 @@ def model_components(
     i: int,
     p2_percent: float,
     p3_percent: float,
+    #p4_percent: float,
     cfg: MultiChanceConfig,
 ):
     n = np.arange(cfg.nmax)
 
     p2 = p2_percent / 100.0
     p3 = p3_percent / 100.0
-    p1 = 1.0 - p2 - p3
+    # p4 = p4_percent / 100.0
+    p1 = 1.0 - p2 - p3 #- p4
 
     p1 = max(p1, 0.0)
     p2 = max(p2, 0.0)
     p3 = max(p3, 0.0)
+    # p4 = max(p4, 0.0)
 
-    s = p1 + p2 + p3
+    s = p1 + p2 + p3 #+ p4
     if s <= 0.0:
-        p1, p2, p3 = 1.0, 0.0, 0.0
+        p1, p2, p3 = 1.0, 0.0, 0.0 # p4, 0.0
     else:
-        p1, p2, p3 = p1 / s, p2 / s, p3 / s
+        p1, p2, p3 = p1 / s, p2 / s, p3 / s # p4, p4 / s
 
-    nubar1, sigma1, nubar2, sigma2, nubar3, sigma3 = _component_parameters(E, i, cfg)
+    nubar1, sigma1, nubar2, sigma2, nubar3, sigma3 = _component_parameters(E, i, cfg) # , nubar4, sigma4
 
     g1 = gaussian(n, nubar1, sigma1)
     g2 = gaussian(n - 1, nubar2, sigma2)
     g3 = gaussian(n - 2, nubar3, sigma3)
+    # g4 = gaussian(n - 3, nubar4, sigma4)
 
     g1 = g1 / g1.sum()
     g2 = g2 / g2.sum()
     g3 = g3 / g3.sum()
+    # g4 = g4 / g4.sum()
 
     c1 = p1 * g1
     c2 = p2 * g2
     c3 = p3 * g3
+    # c4 = p4 * g4
 
-    total = c1 + c2 + c3
+    total = c1 + c2 + c3 #+ c4
     total = total / total.sum()
 
-    return n, c1, c2, c3, total
+    return n, c1, c2, c3, total # c4
 
 
-def model_pnu(E: float, i: int, p2: float, p3: float, cfg: MultiChanceConfig) -> np.ndarray:
+def model_pnu(
+        E: float, 
+        i: int, 
+        p2: float, 
+        p3: float, 
+        # p4: float, 
+        cfg: MultiChanceConfig
+    ) -> np.ndarray:
     _, _, _, _, total = model_components(
         E,
         i,
         100.0 * p2,
         100.0 * p3,
+        # 100.0 * p4,
         cfg,
     )
     return total
@@ -221,36 +257,67 @@ def _softmax3(x2: float, x3: float) -> tuple[float, float, float]:
     p = ez / ez.sum()
     return float(p[0]), float(p[1]), float(p[2])
 
+# def _softmax4(x2: float, x3: float, x4: float) -> tuple[float, float, float, float]:
+#     z = np.array([0.0, x2, x3, x4])
+#     z = z - np.max(z)
+#     ez = np.exp(z)
+#     p = ez / ez.sum()
+#     return float(p[0]), float(p[1]), float(p[2]), float(p[3])
 
 def _decode_probabilities(
     energy: np.ndarray,
     x: np.ndarray,
     cfg: MultiChanceConfig,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]: #, np.ndarray]:
     nE = len(energy)
 
     logits_p2 = x[2:2 + nE]
     logits_p3 = x[2 + nE:2 + 2 * nE]
+    #logits_p4 = x[2 + 2 * nE:2 + 3 * nE]
 
     p1 = np.zeros(nE)
     p2 = np.zeros(nE)
     p3 = np.zeros(nE)
+    # p4 = np.zeros(nE)
+
+    Eth2 = cfg.Sn_239U
+    Eth3 = cfg.Sn_239U + cfg.Sn_238U
+    # Eth4 = cfg.Sn_239U + cfg.Sn_238U + cfg.Sn_237U
 
     for i, E in enumerate(energy):
-        if E < cfg.Sn_239U:
+        if E < Eth2:
             p1[i], p2[i], p3[i] = 1.0, 0.0, 0.0
-
-        elif E < cfg.Sn_239U + cfg.Sn_238U:
+        elif E < Eth3:
             p1[i], p2[i] = _softmax2(logits_p2[i])
             p3[i] = 0.0
-
         else:
             p1[i], p2[i], p3[i] = _softmax3(logits_p2[i], logits_p3[i])
 
-    return p1, p2, p3
+    # for i, E in enumerate(energy):
+    #     if E < Eth2:
+    #         # p1[i], p2[i], p3[i], p4[i] = 1.0, 0.0, 0.0, 0.0
+    #         p1[i], p2[i], p3[i] = 1.0, 0.0, 0.0
+
+    #     elif E < Eth3:
+    #         p1[i], p2[i] = _softmax2(logits_p2[i])
+    #         # p3[i], p4[i] = 0.0, 0.0
+    #         p3[i] = 0.0
+
+    #     elif E < Eth4:
+    #         p1[i], p2[i], p3[i] = _softmax3(logits_p2[i], logits_p3[i])
+    #         # p4[i] = 0.0
+
+    #     else:
+    #         p1[i], p2[i], p3[i], p4[i] = _softmax4(
+    #             logits_p2[i],
+    #             logits_p3[i],
+    #             logits_p4[i],
+    #         )
+
+    return p1, p2, p3 #, p4
 
 
-def _smoothness_penalty(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray) -> float:
+def _smoothness_penalty(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray) -> float: # , p4: np.ndarray
     if len(p1) < 3:
         return 0.0
 
@@ -258,6 +325,7 @@ def _smoothness_penalty(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray) -> float
         np.mean(np.diff(p1, n=2) ** 2)
         + np.mean(np.diff(p2, n=2) ** 2)
         + np.mean(np.diff(p3, n=2) ** 2)
+        #+ np.mean(np.diff(p4, n=2) ** 2)
     )
 
 
@@ -270,10 +338,10 @@ def _global_objective(
     b_common = float(x[0])
     c_common = float(x[1])
 
-    cfg.b_238U = cfg.b_237U = cfg.b_236U = b_common
-    cfg.c_238U = cfg.c_237U = cfg.c_236U = c_common
+    cfg.b_238U = cfg.b_237U = cfg.b_236U = b_common # cfg.b_235U
+    cfg.c_238U = cfg.c_237U = cfg.c_236U = c_common # cfg.c_235U
 
-    p1, p2, p3 = _decode_probabilities(energy, x, cfg)
+    p1, p2, p3 = _decode_probabilities(energy, x, cfg) # , p4
 
     pnu_fit = []
 
@@ -283,6 +351,7 @@ def _global_objective(
             i,
             100.0 * p2[i],
             100.0 * p3[i],
+            #100.0 * p4[i],
             cfg,
         )
         pnu_fit.append(total)
@@ -295,7 +364,9 @@ def _global_objective(
     shape_loss = np.mean((pnu_fit - pnu) ** 2)
     nubar_loss = np.mean((nubar_fit - nubar_exp) ** 2)
     sigma_loss = np.mean((sigma_fit - sigma_exp) ** 2)
-    smooth_loss = _smoothness_penalty(p1, p2, p3)
+    smooth_loss = _smoothness_penalty(p1, p2, p3) #, p4)
+
+    # print(f"Debug. w_shape={shape_loss:.4e} | w_nubar={nubar_loss:.4e} | w_sigma={sigma_loss:.4e} | w_smooth={smooth_loss:.4e}")
 
     return (
         cfg.w_shape * shape_loss
@@ -316,30 +387,93 @@ def _initial_global_parameters(
 
     logits_p2 = np.full(nE, -8.0)
     logits_p3 = np.full(nE, -8.0)
+    # logits_p4 = np.full(nE, -8.0)
 
     for i, E in enumerate(energy):
         if E < cfg.Sn_239U:
             logits_p2[i] = -12.0
             logits_p3[i] = -12.0
+            # logits_p4[i] = -12.0
+
+        # elif E < cfg.Sn_239U + cfg.Sn_238U:
+        #     t = (E - cfg.Sn_239U) / max(cfg.Sn_238U, 1e-6)
+        #     t = np.clip(t, 0.02, 0.98)
+        #     logits_p2[i] = np.log(t / (1.0 - t))
+        #     logits_p3[i] = -12.0
+        #     # logits_p4[i] = -12.0
+
+        # elif E < cfg.Sn_239U + cfg.Sn_238U:
+        #     t = (E - cfg.Sn_239U) / 8.0
+        #     t = np.clip(t, 0.02, 0.70)
+        #     p2 = t
+        #     p1 = 1.0 - p2
+        #     logits_p2[i] = np.log(p2 / p1)
+        #     logits_p3[i] = -12.0
 
         elif E < cfg.Sn_239U + cfg.Sn_238U:
-            t = (E - cfg.Sn_239U) / max(cfg.Sn_238U, 1e-6)
-            t = np.clip(t, 0.02, 0.98)
-            logits_p2[i] = np.log(t / (1.0 - t))
+            t = (E - cfg.Sn_239U) / 6.0
+            t = np.clip(t, 0.0, 1.0)
+            p2_max = 0.55
+            p2 = p2_max * t
+            p1 = 1.0 - p2
+            logits_p2[i] = np.log(p2 / p1)
             logits_p3[i] = -12.0
 
+        # else:
+        #     t = (E - (cfg.Sn_239U + cfg.Sn_238U)) / 6.0
+        #     t = np.clip(t, 0.0, 1.0)
+        #     p1 = 0.10
+        #     p3 = 0.65 * t
+        #     p2 = max(1.0 - p1 - p3, 1e-6)
+        #     logits_p2[i] = np.log(p2 / p1)
+        #     logits_p3[i] = np.log(p3 / p1) if p3 > 0 else -12.0
+
         else:
-            t3 = (E - (cfg.Sn_239U + cfg.Sn_238U)) / 8.0
-            t3 = np.clip(t3, 0.02, 0.70)
-
-            p3 = t3
-            p2 = 1.0 - p3
-            p1 = 1e-3
-
+            t = (E - (cfg.Sn_239U + cfg.Sn_238U)) / 6.0
+            t = np.clip(t, 0.0, 1.0)
+            p1 = 0.10 * (1.0 - t) + 0.03
+            p3 = 0.45 * t
+            p2 = max(1.0 - p1 - p3, 1e-6)
             logits_p2[i] = np.log(p2 / p1)
-            logits_p3[i] = np.log(p3 / p1)
+            logits_p3[i] = np.log(p3 / p1) if p3 > 0 else -12.0
 
-    return np.r_[b0, c0, logits_p2, logits_p3]
+        # else:
+        #     t3 = (E - (cfg.Sn_239U + cfg.Sn_238U)) / 30.0
+        #     t3 = np.clip(t3, 0.01, 0.15)
+        #     p1 = 1e-3
+        #     p3 = t3
+        #     p2 = max(1.0 - p1 - p3, 1e-6) #-p4
+        #     logits_p2[i] = np.log(p2 / p1)
+        #     logits_p3[i] = np.log(p3 / p1)
+
+            # Eth4 = cfg.Sn_239U + cfg.Sn_238U + cfg.Sn_237U
+
+            # if E < Eth4:
+            #     p1 = 1e-3
+            #     # p4 = 1e-6
+            #     p3 = t3
+            #     p2 = max(1.0 - p1 - p3, 1e-6) #-p4
+
+            # else:
+                # t4 = (E - Eth4) / 8.0
+                # t4 = np.clip(t4, 0.02, 0.40)
+                # p1 = 1e-3
+                # p4 = t4
+                # p3 = max(0.30, 0.70 - t4)
+                # p2 = max(1.0 - p1 - p3 - p4, 1e-6)
+
+                # t4 = (E - Eth4) / 6.0
+                # t4 = np.clip(t4, 0.05, 0.60)
+                # p1 = 1e-4
+                # p4 = t4
+                # p3 = max(0.20, 0.65 - 0.7 * t4)
+                # p2 = max(1.0 - p1 - p3 - p4, 1e-6)
+
+            # logits_p2[i] = np.log(p2 / p1)
+            # logits_p3[i] = np.log(p3 / p1)
+            # logits_p4[i] = np.log(p4 / p1)
+
+    return np.r_[b0, c0, logits_p2, logits_p3]#, logits_p4]
 
 
 def optimize_global_parameters(
@@ -347,7 +481,15 @@ def optimize_global_parameters(
     pnu: np.ndarray,
     cfg: MultiChanceConfig,
     maxiter = 5000,
-) -> tuple[MultiChanceConfig, np.ndarray, np.ndarray, np.ndarray, float]:
+    ) -> tuple[
+    MultiChanceConfig,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    # np.ndarray,
+    float,
+    np.ndarray,
+]:
     x0 = _initial_global_parameters(energy, cfg)
 
     nE = len(energy)
@@ -356,7 +498,20 @@ def optimize_global_parameters(
         [(cfg.b_min, cfg.b_max), (cfg.c_min, cfg.c_max)]
         + [(-15.0, 15.0)] * nE
         + [(-15.0, 15.0)] * nE
+        # + [(-15.0, 15.0)] * nE
     )
+
+    pbar = tqdm(
+        total=maxiter,
+        desc="Powell iterations",
+        unit="iter",
+    )
+
+    def callback(xk):
+        pbar.update(1)
+        loss_eval = _global_objective(xk, energy, pnu, cfg)
+        pbar.set_postfix(loss=f"{loss_eval:.4e}")
+        # tqdm.write(f"  iter {pbar.n:3d} | loss = {loss_eval:.6e}")
 
     res = minimize(
         _global_objective,
@@ -364,19 +519,23 @@ def optimize_global_parameters(
         args=(energy, pnu, cfg),
         method="Powell",
         bounds=bounds,
+        callback=callback,
         options={
             "maxiter": maxiter,
-            "ftol": 1e-12,
-            "xtol": 1e-8,
+            "ftol": 1e-7,
+            "xtol": 1e-7,
             "disp": True,
         },
     )
 
+    pbar.close()
+
     x = res.x
 
-    cfg.b_238U = cfg.b_237U = cfg.b_236U = float(x[0])
-    cfg.c_238U = cfg.c_237U = cfg.c_236U = float(x[1])
+    cfg.b_238U = cfg.b_237U = cfg.b_236U = float(x[0]) # cfg.b_235U
+    cfg.c_238U = cfg.c_237U = cfg.c_236U = float(x[1]) # cfg.c_235U
 
+    # p1, p2, p3, p4 = _decode_probabilities(energy, x, cfg)
     p1, p2, p3 = _decode_probabilities(energy, x, cfg)
 
     print("Global fit:")
@@ -384,78 +543,8 @@ def optimize_global_parameters(
     print(f"b_common={cfg.b_238U:.6f}")
     print(f"c_common={cfg.c_238U:.6f}")
 
-    return cfg, p1, p2, p3, float(res.fun), x
+    return cfg, p1, p2, p3, float(res.fun), x #, p4, 
 
-
-def fit_multichance_for_energy(
-    E: float,
-    i: int,
-    pnu_exp: np.ndarray,
-    cfg: MultiChanceConfig,
-) -> dict:
-    """
-    Gardée pour compatibilité.
-
-    Cette fonction fait encore un fit local si appelée seule.
-    Dans extract_multichance_probabilities, les probabilités finales viennent
-    du fit global optimize_global_parameters.
-    """
-    pnu_exp = pnu_exp / pnu_exp.sum()
-
-    def objective(y):
-        p2, p3 = y
-
-        if p2 < 0.0 or p3 < 0.0 or p2 + p3 > 1.0:
-            return 1e12
-
-        pnu_fit = model_pnu(E, i, p2, p3, cfg)
-
-        nubar_exp, sigma_exp = distribution_moments(pnu_exp[None, :])
-        nubar_fit, sigma_fit = distribution_moments(pnu_fit[None, :])
-
-        shape_loss = np.mean((pnu_fit - pnu_exp) ** 2)
-        nubar_loss = (nubar_fit[0] - nubar_exp[0]) ** 2
-        sigma_loss = (sigma_fit[0] - sigma_exp[0]) ** 2
-
-        return (
-            cfg.w_shape * shape_loss
-            + cfg.w_nubar * nubar_loss
-            + cfg.w_sigma * sigma_loss
-        )
-
-    if E < cfg.Sn_239U:
-        return {"p1": 100.0, "p2": 0.0, "p3": 0.0, "chi2": 0.0}
-
-    if E < cfg.Sn_239U + cfg.Sn_238U:
-        x0 = np.array([0.5, 0.0])
-        bounds = [(0.0, 1.0), (0.0, 0.0)]
-    else:
-        x0 = np.array([0.4, 0.2])
-        bounds = [(0.0, 1.0), (0.0, 1.0)]
-
-    constraints = ({
-        "type": "ineq",
-        "fun": lambda y: 1.0 - y[0] - y[1],
-    },)
-
-    res = minimize(
-        objective,
-        x0=x0,
-        method="SLSQP",
-        bounds=bounds,
-        constraints=constraints,
-        options={"ftol": 1e-12, "maxiter": 500},
-    )
-
-    p2, p3 = res.x
-    p1 = 1.0 - p2 - p3
-
-    return {
-        "p1": 100.0 * p1,
-        "p2": 100.0 * p2,
-        "p3": 100.0 * p3,
-        "chi2": float(res.fun),
-    }
 
 def bootstrap_pnu_rows(pnu, pnu_err=None, n_events=None, rng=None):
     rng = np.random.default_rng() if rng is None else rng
@@ -488,8 +577,11 @@ def bootstrap_multichance_uncertainties(
     energy,
     pnu,
     cfg,
-    n_boot = 5,
-    maxiter = 300,
+    p1_central,
+    p2_central,
+    p3_central,
+    n_boot = 10,
+    maxiter = 100,
     pnu_err=None,
     n_events=None,
     seed=12345,
@@ -500,8 +592,7 @@ def bootstrap_multichance_uncertainties(
     p2_samples = []
     p3_samples = []
 
-    for iboot in range(n_boot):
-        print(f"Bootstrap {iboot+1}/{n_boot}")
+    for iboot in tqdm(range(n_boot), desc="Bootstrap uncertainty quantification", unit="fit"):
 
         pnu_b = bootstrap_pnu_rows(
             pnu,
@@ -527,17 +618,25 @@ def bootstrap_multichance_uncertainties(
     p2_samples = np.asarray(p2_samples)
     p3_samples = np.asarray(p3_samples)
 
-    dp1 = np.std(p1_samples, axis=0, ddof=1)
-    dp2 = np.std(p2_samples, axis=0, ddof=1)
-    dp3 = np.std(p3_samples, axis=0, ddof=1)
+    c1 = 100.0 * p1_central
+    c2 = 100.0 * p2_central
+    c3 = 100.0 * p3_central
 
-    return dp1, dp2, dp3
+    dp1_low = np.maximum(c1 - np.percentile(p1_samples, 16, axis=0), 0.0)
+    dp1_up  = np.maximum(np.percentile(p1_samples, 84, axis=0) - c1, 0.0)
+    dp2_low = np.maximum(c2 - np.percentile(p2_samples, 16, axis=0), 0.0)
+    dp2_up  = np.maximum(np.percentile(p2_samples, 84, axis=0) - c2, 0.0)
+    dp3_low = np.maximum(c3 - np.percentile(p3_samples, 16, axis=0), 0.0)
+    dp3_up  = np.maximum(np.percentile(p3_samples, 84, axis=0) - c3, 0.0)
+
+    return dp1_low, dp1_up, dp2_low, dp2_up, dp3_low, dp3_up
 
 
 def extract_multichance_probabilities(
     pnu_path: Path,
     output_dir: Path,
     cfg: MultiChanceConfig | None = None,
+    stat=None,
 ) -> pd.DataFrame:
     if cfg is None:
         cfg = MultiChanceConfig()
@@ -546,17 +645,22 @@ def extract_multichance_probabilities(
 
     energy, pnu = read_pnu_table(pnu_path)
 
-    en_prefission_238u, en_prefission_237u = load_multichance_reference_data(cfg)
+    en_prefission_238u, en_prefission_237u = load_multichance_reference_data(cfg) #, en_prefission_236u
 
     cfg.en_prefission_238U = en_prefission_238u
     cfg.en_prefission_237U = en_prefission_237u
+    # cfg.en_prefission_236U = en_prefission_236u
 
     max_points = min(
         len(energy),
         len(en_prefission_238u),
         len(en_prefission_237u),
+        #len(en_prefission_236u),
     )
 
+    #Eth4 = cfg.Sn_239U + cfg.Sn_238U + cfg.Sn_237U + 5 
+
+    # max_points = int(np.searchsorted(energy, Eth4)) # stop before 4th chance
     energy = energy[:max_points]
     pnu = pnu[:max_points]
 
@@ -570,21 +674,22 @@ def extract_multichance_probabilities(
         emax=4.0,
     )
 
-    cfg, p1, p2, p3, global_loss, x = optimize_global_parameters(
+    cfg, p1, p2, p3, global_loss, _ = optimize_global_parameters(
         energy,
         pnu,
         cfg,
         maxiter=100,
     )
 
-    dp1, dp2, dp3 = bootstrap_multichance_uncertainties(
+    dp1_low, dp1_up, dp2_low, dp2_up, dp3_low, dp3_up = bootstrap_multichance_uncertainties(
         energy,
         pnu,
         cfg,
+        p1, p2, p3,
         n_boot=10,
         maxiter=100,
         pnu_err=None,
-        n_events=1e4, # typical averaged value
+        n_events=stat,
     )
     
     rows = []
@@ -595,6 +700,7 @@ def extract_multichance_probabilities(
             i,
             100.0 * p2[i],
             100.0 * p3[i],
+            # 100.0 * p4[i],
             cfg,
         )
 
@@ -606,19 +712,27 @@ def extract_multichance_probabilities(
                 "p1": 100.0 * p1[i],
                 "p2": 100.0 * p2[i],
                 "p3": 100.0 * p3[i],
+                # "p4": 100.0 * p4[i],
                 "chi2": local_chi2,
             }
         )
 
     df = pd.DataFrame(rows)
 
-    df["dp1_fit"] = dp1
-    df["dp2_fit"] = dp2
-    df["dp3_fit"] = dp3
+    df["dp1_low"] = dp1_low
+    df["dp1_up"]  = dp1_up
+    df["dp2_low"] = dp2_low
+    df["dp2_up"]  = dp2_up
+    df["dp3_low"] = dp3_low
+    df["dp3_up"]  = dp3_up
 
-    df["dp1"] = df["dp1_fit"]
-    df["dp2"] = df["dp2_fit"]
-    df["dp3"] = df["dp3_fit"]
+    # moyenne symétrique (utilisée pour dE_exc et autres)
+    df["dp1"] = (dp1_low + dp1_up) / 2.0
+    df["dp2"] = (dp2_low + dp2_up) / 2.0
+    df["dp3"] = (dp3_low + dp3_up) / 2.0
+    df["dp1_fit"] = df["dp1"]
+    df["dp2_fit"] = df["dp2"]
+    df["dp3_fit"] = df["dp3"]
 
     pnu_fit = []
 
@@ -628,6 +742,7 @@ def extract_multichance_probabilities(
             i,
             row["p2"],
             row["p3"],
+            # row["p4"],
             cfg,
         )
         pnu_fit.append(total)
@@ -646,11 +761,35 @@ def extract_multichance_probabilities(
     df["c_common"] = cfg.c_238U
     df["global_loss"] = global_loss
 
+    # excitation energy
+
+    E_exc = np.zeros(len(energy))
+    for i, En in enumerate(energy):
+        en1 = cfg.en_prefission_238U[i]
+        en2 = cfg.en_prefission_237U[i]
+        E1 = En + cfg.Sn_239U
+        E2 = En - en1
+        E3 = En - cfg.Sn_238U - en1 - en2
+        E_exc[i] = p1[i] * E1 + p2[i] * E2 + p3[i] * E3
+    df["E_exc"] = E_exc
+
+    dE_exc_proba = np.zeros(len(energy))
+    for i, En in enumerate(energy):
+        en1 = cfg.en_prefission_238U[i]
+        en2 = cfg.en_prefission_237U[i]
+        d2 = ((dp2_low[i] + dp2_up[i]) / 2.0 / 100.0) * (en1 + cfg.Sn_239U)
+        d3 = ((dp3_low[i] + dp3_up[i]) / 2.0 / 100.0) * (en1 + cfg.Sn_238U + en2 + cfg.Sn_239U)
+        dE_exc_proba[i] = np.sqrt(d2**2 + d3**2)
+    df["dE_exc_proba"] = dE_exc_proba
+
+    # saving
+
     df.to_csv(output_dir / "multichance_probabilities.txt", sep="\t", index=False)
 
     df[["energy", "p1"]].to_csv(output_dir / "p1.txt", sep="\t", index=False, header=False)
     df[["energy", "p2"]].to_csv(output_dir / "p2.txt", sep="\t", index=False, header=False)
     df[["energy", "p3"]].to_csv(output_dir / "p3.txt", sep="\t", index=False, header=False)
+    # df[["energy", "p4"]].to_csv(output_dir / "p4.txt", sep="\t", index=False, header=False)
 
     np.savetxt(
         output_dir / "multichance_pnu_fit.txt",

@@ -7,7 +7,7 @@ from .operators import response_operator, derivative_operator
 from .criteria import scan_lambdas, choose_lambda
 from .regularization import solve_tikhonov_nnls, solve_tikhonov_constrained
 from .moments import mean, summarize_distribution
-from .uncertainty import propagate_distribution_errors, mean_error, sigma_error, f2_error, f3_error
+from .uncertainty import propagate_distribution_errors, mean_error, sigma_error, f2_error, f3_error, f4_error
 from .tof import energy_error 
 
 
@@ -68,19 +68,20 @@ def run_analysis(config: Config) -> dict:
 
         lam = choose_lambda(scan, reg.lambda_choice)
         x, _ = solve_tikhonov_constrained(A, y, D, lam, nubar_target)
-        xerr = propagate_distribution_errors(A, D, lam, y, stat)
+        cov_p = propagate_distribution_errors(A, D, lam, y, stat)
         
         summary = summarize_distribution(x)
         summary["energy"] = energy
         summary["lambda"] = lam
         summary["stat"] = stat
         summary["energy_err"] = energy_err[i]   
-        summary["nubar_err"] = mean_error(x, xerr)
-        summary["sigma_err"] = sigma_error(x, xerr)
-        summary["f2_err"] = f2_error(x, xerr)
-        summary["f3_err"] = f3_error(x, xerr)
+        summary["nubar_err"] = mean_error(x, cov_p=cov_p)
+        summary["sigma_err"] = sigma_error(x, cov_p=cov_p)
+        summary["f2_err"] = f2_error(x, cov_p=cov_p)
+        summary["f3_err"] = f3_error(x, cov_p=cov_p)
+        summary["f4_err"] = f4_error(x, cov_p=cov_p)
         unfolded.append(x)
-        unfolded_err.append(xerr)
+        unfolded_err.append(np.sqrt(np.maximum(np.diag(cov_p), 0.0)))
         lambda_opt.append(lam)
         rows.append(summary)
 
@@ -89,6 +90,7 @@ def run_analysis(config: Config) -> dict:
         "bins": bins,
         "pnu": np.asarray(unfolded),
         "pnu_err": np.asarray(unfolded_err),
+        "stat": np.asarray(stat),
         "lambda": np.asarray(lambda_opt),
         "moments": pd.DataFrame(rows),
     }

@@ -19,3 +19,13 @@ def raised_cosine(n, mu, sigma):
 
 def linear_model(E, a, b):
     return a * E + b
+
+
+def delta_tke_to_sigma(delta_tke, sn_en_mean):
+    """sigma_nu ~ delta_TKE / <Sn + en> (B3 model)."""
+    return delta_tke / sn_en_mean
+
+
+def delta_tke_to_sigma_err(delta_tke, sn_en_mean, sn_en_std):
+    """Incertitude sur sigma_nu par propagation de l'ecart-type sur <Sn+en>."""
+    return delta_tke * sn_en_std / sn_en_mean ** 2

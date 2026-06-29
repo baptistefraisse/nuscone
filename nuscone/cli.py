@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-
+import numpy as np
 from .config import load_config
 from .pipeline import run_analysis, save_results
 from .references import load_references
@@ -24,18 +24,21 @@ def main() -> None:
             plot_pnu_publication,
             plot_lambda_publication,
             plot_pnu_triptych_publication,
+            plot_pnu_3d,
             plot_moment_publication,
             plot_multichance_probabilities,
             plot_multichance_pnu_fit,
             plot_multichance_moments,
             plot_multichance_sigma,
             plot_multichance_probabilities,
+            plot_multichance_excitation_sigma,
             savefig,
         )
 
         moments = results["moments"]
         energies = results["energies"]
         bins = results["bins"]
+        stat = results["stat"]
         refs = load_references(config.paths.reference_dir)
 
         # nubar
@@ -97,9 +100,12 @@ def main() -> None:
             "238U_SCONE_Pnu_triptych.pdf"
         )
 
+        fig, _ = plot_pnu_3d(energies[:-1], results["pnu"][:-1])
+        savefig(fig, config.paths.output_dir / "figures" / "238U_SCONE_pnu_3d.pdf")
+
         # factorial moments
 
-        for order in [2, 3]:
+        for order in [2, 3, 4]:
             fig, _ = plot_moment_publication(
                 energies=moments["energy"].to_numpy(),
                 values=moments[f"f{order}"].to_numpy(),
@@ -123,6 +129,16 @@ def main() -> None:
             pnu_path=pnu_path,
             output_dir=multichance_dir,
             cfg=MultiChanceConfig(),
+            stat=stat,
+        )
+
+        multichance = multichance.merge(
+            results["moments"][["energy", "sigma_err", "energy_err"]],
+            on="energy",
+            how="left"
+        )
+        multichance["dE_exc"] = np.sqrt(
+            multichance["energy_err"]**2 + multichance["dE_exc_proba"]**2
         )
 
         fig, _ = plot_multichance_pnu_fit(
@@ -140,6 +156,11 @@ def main() -> None:
 
         fig, _ = plot_multichance_probabilities(multichance)
         savefig(fig, config.paths.output_dir / "figures" / "238U_SCONE_multichance_probabilities.pdf")
+
+        # excitation energy studies
+
+        fig, _ = plot_multichance_excitation_sigma(multichance, refs=refs)
+        savefig(fig, config.paths.output_dir / "figures" / "238U_SCONE_excitation_sigma.pdf")
 
 
 if __name__ == "__main__":

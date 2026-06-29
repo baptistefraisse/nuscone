@@ -2,6 +2,10 @@
 
 Neutron multiplicity analysis for SCONE
 
+<p align="center">
+  <img src="results/figures/238U_SCONE_pnu_3d.pdf" width="600">
+</p>
+
 # Installation
 
 ```bash
@@ -25,8 +29,9 @@ NUSCONE was developed to extract prompt-fission neutron multiplicity distributio
 The analysis is performed in three successive steps:
 
 1. Reconstruction of the neutron-multiplicity distributions $p(\nu)$ 
-2. Calculation of neutron-multiplicity moments ($\bar{\nu}$, $\sigma$, $f_2$, $f_3$).
-3. Extraction of first-, second-, and third-chance fission probabilities through
+2. Calculation of neutron-multiplicity moments ($\bar{\nu}$, $\sigma$, $f_2$, $f_3$)
+3. Extraction of first-, second-, and third-chance fission probabilities
+4. Calculation of the effective excitation energy of the compound system
 
 
 ## 1. Reconstruction of neutron-multiplicity distributions
@@ -46,20 +51,20 @@ Several observables are derived from $p(\nu)$ as a function of the incident neut
 
 Above the neutron separation energy, fission may occur after one or several pre-fission neutron emissions. Those processes are called multi-chance fission [1]. As a results, the neutron-multiplicity distribution can be written as
 
-$P_{\mathrm{tot}}(\nu,E)=p_1(E)P_1(\nu,E)+p_2(E)P_2(\nu,E)+p_3(E)P_3(\nu,E) + ... $
+$$p(\nu,E)=x_1(E)\,p_1(\nu,E)+x_2(E)\,p_2(\nu,E)+x_3(E)\,p_3(\nu,E) + ... $$
 
-where $p_1+p_2+p_3+...=1$ denote the multi-chance fission probabilities. So as to extract those ratios, NUSCONE approximates the individual $p(\nu)$ by a Gaussian form for which centroids and widths are parameterized using linear functions of excitation energy [1].
+where $x_1+x_2+x_3+...=1$ denote the multi-chance fission probabilities. So as to extract those ratios, NUSCONE approximates the individual distributions $p_i$ by a Gaussian form for which centroids and widths are parameterized using linear functions of excitation energy [1].
 
-A global minimization is performed simultaneously over all incident neutron energies, adjusting the multi-chance fission probabilities $p_i$ to reproduce the experimental $p(\nu)$ for each energy.
+A global minimization is performed simultaneously over all incident neutron energies, adjusting the multi-chance fission probabilities $x_i$, as well as the linear laws describing $\bar\nu$ and $\sigma$ for each intermediate fissioning systems, so as to reproduce the experimental $p(\nu)$ for each energy.
 
 The quality of the extracted probabilities is verified through several independent checks: 
-- fair reproduction of each $p(\nu)$,
-- fair reproduction of $\bar\mu$,
--  fair reproduction of the standard-deviation $\sigma$.
+- fair reproduction of global $p(\nu)$,
+- fair reproduction of global $\bar\nu$,
+- fair reproduction of global standard-deviation $\sigma$.
 
 Uncertainties are quantified through a bootstrap method.
 
-Multi-chance fission probabilities, $p_1$, $p_2$, and $p_3$, are plotted in in _/results/fig_ and saved as CSV files in _/results/tables_.
+Multi-chance fission probabilities, $x_1$, $x_2$, and $x_3$, are plotted in _/results/fig_ and saved as CSV files in _/results/tables_.
 
 # Bibliography
 
