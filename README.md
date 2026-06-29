@@ -3,7 +3,7 @@
 Neutron multiplicity analysis for SCONE
 
 <p align="center">
-  <img src="results/figures/238U_SCONE_pnu_3d.pdf" width="600">
+  <img src="docs/images/238U_SCONE_pnu_3d.png" width="600">
 </p>
 
 # Installation
