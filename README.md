@@ -72,6 +72,13 @@ nuscone -c configs/u238_default.yaml --plots
 # Bibliography
 
 [1] B. Fraïsse, G. Bélier, _et al_., Phys. Rev. C **108**, 014610 (2023) 
+[2] G. Belier et al., Nucl. Instrum. Methods Phys. Res. A **1072**, 170225 (2025).
+[3] B. Fraisse, PhD thesis, Univ. Paris-Saclay (2024).
+[4] A. Bernard, A., Regnier, _et al_. Eur. Phys. J. A **62**, 112 (2026).
+[5] Joint Evaluated Fission and Fusion Project. (2025). JEFF-4.0 Evaluated Data. OECD NEA.
+[6] P. Talou et al. Comp. Phys. Comm. **269**, 108087 (2021).
+[7] K.-H. Schmidt and B. Jurado et al. Nucl. Data Sheets **131**, 107–221 (2016).
+
 
 # Contact
 
