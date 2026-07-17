@@ -765,11 +765,14 @@ def plot_multichance_moments(df):
 
     fig, ax = plt.subplots(figsize=(10, 10))
 
+    nubar_err = df["nubar_err"].to_numpy() if "nubar_err" in df.columns else None
+
     errorbar_model(
         ax,
         "SCONE",
         df["energy"],
         df["nubar_exp"],
+        yerr=nubar_err,
         label="SCONE",
         linestyle="none",
         linewidth=2,
@@ -778,15 +781,28 @@ def plot_multichance_moments(df):
         zorder=10,
     )
 
+    color_fit = _style("SCONE")["color"]
+
     ax.plot(
         df["energy"],
         df["nubar_fit"],
-        color=_style("SCONE")["color"],
+        color=color_fit,
         linestyle="-",
         linewidth=3,
         label="Multi-chance fit",
         zorder=8,
     )
+
+    if "nubar_fit_lo" in df.columns and "nubar_fit_hi" in df.columns:
+        ax.fill_between(
+            df["energy"],
+            df["nubar_fit_lo"],
+            df["nubar_fit_hi"],
+            color=color_fit,
+            alpha=0.25,
+            linewidth=0,
+            zorder=7,
+        )
 
     ax.set_xlabel(
         "Incident neutron energy (MeV)",
@@ -819,11 +835,14 @@ def plot_multichance_sigma(df):
 
     fig, ax = plt.subplots(figsize=(10, 10))
 
+    sigma_err = df["sigma_err"].to_numpy() if "sigma_err" in df.columns else None
+
     errorbar_model(
         ax,
         "SCONE",
         df["energy"],
         df["sigma_exp"],
+        yerr=sigma_err,
         label="SCONE",
         linestyle="none",
         linewidth=2,
@@ -832,15 +851,28 @@ def plot_multichance_sigma(df):
         zorder=10,
     )
 
+    color_fit = _style("SCONE")["color"]
+
     ax.plot(
         df["energy"],
         df["sigma_fit"],
-        color=_style("SCONE")["color"],
+        color=color_fit,
         linestyle="-",
         linewidth=3,
         label="Multi-chance fit",
         zorder=8,
     )
+
+    if "sigma_fit_lo" in df.columns and "sigma_fit_hi" in df.columns:
+        ax.fill_between(
+            df["energy"],
+            df["sigma_fit_lo"],
+            df["sigma_fit_hi"],
+            color=color_fit,
+            alpha=0.25,
+            linewidth=0,
+            zorder=7,
+        )
 
     ax.set_xlabel(
         "Incident neutron energy (MeV)",
@@ -1000,7 +1032,7 @@ def plot_multichance_probabilities(df, reference_dir=Path("data/references")):
     return fig, axes
 
 
-def plot_multichance_excitation_sigma(df, refs=None, sn_en_cf252=8.5, sn_en_cf252_err=0.5, emax=18, figsize=(10, 10)):
+def plot_multichance_excitation_sigma(df, refs=None, sn_en_cf252=8.5, sn_en_cf252_err=0.5, sn_en_238u=8.5, sn_en_238u_err=0.5, emax=18, figsize=(10, 10), thermal_points=None):
     setup_publication_style()
     fig, ax = plt.subplots(figsize=figsize)
 
@@ -1009,6 +1041,13 @@ def plot_multichance_excitation_sigma(df, refs=None, sn_en_cf252=8.5, sn_en_cf25
     dE_exc = df["dE_exc"].to_numpy()[mask] if "dE_exc" in df.columns else None
     sigma_exp = df["sigma_exp"].to_numpy()[mask]
     sigma_err  = df["sigma_err"].to_numpy()[mask] if "sigma_err" in df.columns else None
+    nubar_exp = df["nubar_exp"].to_numpy()[mask]
+
+    sqrt_nubar_anchor = None
+    sqrt_nubar_anchor_err = None
+    cf_handle = None
+    u238_handle = None
+    sqrt_nubar_handle = None
 
     if refs is not None and "CF252_B3" in refs:
         from .models import delta_tke_to_sigma, delta_tke_to_sigma_err
@@ -1016,17 +1055,99 @@ def plot_multichance_excitation_sigma(df, refs=None, sn_en_cf252=8.5, sn_en_cf25
         dtke = refs["CF252_B3"]["delta_TKE"]
         sigma_cf = delta_tke_to_sigma(dtke, sn_en_cf252)
         sigma_cf_err = delta_tke_to_sigma_err(dtke, sn_en_cf252, sn_en_cf252_err)
-        ax.errorbar(E_exc_cf, sigma_cf, yerr=sigma_cf_err,
+        cf_handle = ax.errorbar(E_exc_cf, sigma_cf, yerr=sigma_cf_err,
                     fmt="o", color="teal", markersize=12,
-                    elinewidth=3, capsize=5, capthick=3, zorder=12,
+                    elinewidth=4, capsize=5, capthick=3, zorder=12,
                     label=r"Microscopic calculation $^{252}$Cf")
 
-    errorbar_model(
+    if refs is not None and "U238_B3" in refs:
+        from .models import delta_tke_to_sigma, delta_tke_to_sigma_err
+        E_exc_u238 = refs["U238_B3"]["E_exc"]
+        dtke_u238 = refs["U238_B3"]["delta_TKE"]
+        sigma_u238 = delta_tke_to_sigma(dtke_u238, sn_en_238u)
+        sigma_u238_err = delta_tke_to_sigma_err(dtke_u238, sn_en_238u, sn_en_238u_err)
+        u238_handle = ax.errorbar(E_exc_u238[0], sigma_u238[0], yerr=sigma_u238_err[0],
+                    fmt="*", color="blue", markersize=12,
+                    elinewidth=3, capsize=5, capthick=3, zorder=12,
+                    label=r"Microscopic calculation $^{238}$U")
+        u238_handle.lines[2][0].set_linestyle("dashed")
+        sqrt_nubar_anchor = np.interp(0.0, E_exc_u238, sigma_u238)
+        sqrt_nubar_anchor_err = np.interp(0.0, E_exc_u238, sigma_u238_err)
+
+    scone_handle = errorbar_model(
         ax, "SCONE", E_exc, sigma_exp,
         xerr=dE_exc, yerr=sigma_err,
-        label="SCONE", linestyle="none",
+        label=r"SCONE $^{238}$U(n$_{\rm fast}$,f)", linestyle="none",
         linewidth=2, markersize=7, capsize=3, zorder=10,
     )
+
+    sqrt_nubar_band = None
+    if sqrt_nubar_anchor is not None:
+        E_exc_grid = np.linspace(0.0, 20, 300)
+
+        # Simple model for the average neutron multiplicity
+        nubar_0 = 2.5
+        dnubar_dE = 0.1
+        nubar_model = nubar_0 + dnubar_dE * E_exc_grid
+
+        # Evolution law normalized to 1 at E_exc = 0
+        scaling = np.sqrt(nubar_model / nubar_0)
+
+        # Central theoretical prediction
+        sigma_model = sqrt_nubar_anchor * scaling
+
+        sqrt_nubar_handle, = ax.plot(
+            E_exc_grid,
+            sigma_model,
+            color="steelblue",
+            linestyle="--",
+            linewidth=3,
+            zorder=9,
+            label=r"Statistical evolution model $\propto \sqrt{\bar{\nu}}$",
+        )
+
+        # Propagate the two extremities of the theoretical error bar
+        if sqrt_nubar_anchor_err is not None:
+            sigma_model_low = (
+                sqrt_nubar_anchor - sqrt_nubar_anchor_err
+            ) * scaling
+
+            sigma_model_high = (
+                sqrt_nubar_anchor + sqrt_nubar_anchor_err
+            ) * scaling
+
+            sqrt_nubar_band = ax.fill_between(
+                E_exc_grid,
+                sigma_model_low,
+                sigma_model_high,
+                color="lightskyblue",
+                alpha=0.25,
+                linewidth=0,
+                zorder=8,
+                #label=r"$\sigma \propto \sqrt{\bar{\nu}}$",
+            )
+
+    thermal_handles = []
+    thermal_labels = []
+    if thermal_points is not None:
+        seen = set()
+        for pt in thermal_points:
+            label = pt.get("label", "")
+            color = pt.get("color", "gray")
+            marker = pt.get("marker", "s")
+            E_exc_th = pt["E_exc"]
+            sigmas = pt["sigmas"]
+            for sigma_val in sigmas:
+                h, = ax.plot(
+                    E_exc_th, sigma_val,
+                    marker=marker, color=color,
+                    markersize=10, linestyle="none", zorder=11,
+                    label="_nolegend_",
+                )
+                if label not in seen:
+                    thermal_handles.append(h)
+                    thermal_labels.append(label)
+                    seen.add(label)
 
     ax.set_xlabel(
         r"Excitation energy (MeV)",
@@ -1036,13 +1157,31 @@ def plot_multichance_excitation_sigma(df, refs=None, sn_en_cf252=8.5, sn_en_cf25
         r"Neutron multiplicity standard-deviation",
         fontsize=PLOT_STYLE["label_size"],
     )
-    ax.legend(loc="upper left", frameon=False,
-              fontsize=PLOT_STYLE["legend_size"],
-              handlelength=1.6, borderpad=0.2, labelspacing=0.4)
+
+    # Experimental values: SCONE sigma + thermal isotopes (upper left)
+    exp_handles = [scone_handle] + thermal_handles
+    exp_labels = [scone_handle.get_label()] + thermal_labels
+    exp_legend = ax.legend(
+        exp_handles, exp_labels,
+        loc="upper left", frameon=False,
+        fontsize=PLOT_STYLE["legend_size"],
+        handlelength=1.6, borderpad=0.2, labelspacing=0.4,
+    )
+    ax.add_artist(exp_legend)
+
+    # Models: sqrt(nubar) fit, microscopic 238U, microscopic 252Cf (lower right)
+    model_handles = [h for h in [cf_handle, u238_handle, sqrt_nubar_handle] if h is not None]
+    model_labels = [h.get_label() for h in model_handles]
+    ax.legend(
+        model_handles, model_labels,
+        loc="lower right", frameon=False,
+        fontsize=PLOT_STYLE["legend_size"],
+        handlelength=1.6, borderpad=0.2, labelspacing=0.4,
+    )
 
     polish_axes(ax)
     fig.tight_layout()
-    ax.set_ylim(0.8,1.6)
+    ax.set_ylim(0.7,1.7)
     ax.set_xlim(-0.5,20.5)
     ax.set_xticks([0,5,10,15,20])
     ax.set_yticks([1.0, 1.2, 1.4])

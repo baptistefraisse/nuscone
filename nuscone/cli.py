@@ -133,7 +133,7 @@ def main() -> None:
         )
 
         multichance = multichance.merge(
-            results["moments"][["energy", "sigma_err", "energy_err"]],
+            results["moments"][["energy", "nubar_err", "sigma_err", "energy_err"]],
             on="energy",
             how="left"
         )
@@ -159,7 +159,30 @@ def main() -> None:
 
         # excitation energy studies
 
-        fig, _ = plot_multichance_excitation_sigma(multichance, refs=refs)
+        thermal_points = [
+            {
+                "label": r"$^{235}$U(n$_{\rm th}$,f)",
+                "E_exc": 6.545,   # Sn(U-236)
+                "sigmas": [0.5*(1.088+1.070)],
+                "color": "black",
+                "marker": "p",
+            },
+            {
+                "label": r"$^{239}$Pu(n$_{\rm th}$,f)",
+                "E_exc": 6.534,   # Sn(Pu-240)
+                "sigmas": [1.140],
+                "color": "gray",
+                "marker": "^",
+            },
+            {
+                "label": r"$^{241}$Pu(n$_{\rm th}$,f)",
+                "E_exc": 5.902,   # Sn(Pu-242)
+                "sigmas": [1.150],
+                "color": "purple",
+                "marker": "D",
+            },
+        ]
+        fig, _ = plot_multichance_excitation_sigma(multichance, refs=refs, thermal_points=thermal_points)
         savefig(fig, config.paths.output_dir / "figures" / "238U_SCONE_excitation_sigma.pdf")
 
 

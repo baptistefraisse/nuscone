@@ -46,10 +46,10 @@ class MultiChanceConfig:
 
     grid_step_percent: float = 1.0
 
-    w_shape: float  = 1e0    # 1e4
-    w_nubar: float  = 1e0    # 1e3
-    w_sigma: float  = 1e1    # 1e4
-    w_smooth: float = 3e-2   # 1e1
+    w_shape: float  = 1e0    # 1e0
+    w_nubar: float  = 1e0    # 1e0
+    w_sigma: float  = 1e1    # 1e1
+    w_smooth: float = 1e-2   # 3e-2
 
     b_min: float = 2.45
     b_max: float = 2.55
@@ -591,6 +591,8 @@ def bootstrap_multichance_uncertainties(
     p1_samples = []
     p2_samples = []
     p3_samples = []
+    nubar_fit_samples = []
+    sigma_fit_samples = []
 
     for iboot in tqdm(range(n_boot), desc="Bootstrap uncertainty quantification", unit="fit"):
 
@@ -614,22 +616,54 @@ def bootstrap_multichance_uncertainties(
         p2_samples.append(100.0 * p2_b)
         p3_samples.append(100.0 * p3_b)
 
+        pnu_fit_b = np.asarray([
+            model_components(E, i, 100.0 * p2_b[i], 100.0 * p3_b[i], cfg_b)[4]
+            for i, E in enumerate(energy)
+        ])
+        nubar_b, sigma_b = distribution_moments(pnu_fit_b)
+        nubar_fit_samples.append(nubar_b)
+        sigma_fit_samples.append(sigma_b)
+
     p1_samples = np.asarray(p1_samples)
     p2_samples = np.asarray(p2_samples)
     p3_samples = np.asarray(p3_samples)
+    nubar_fit_samples = np.asarray(nubar_fit_samples)
+    sigma_fit_samples = np.asarray(sigma_fit_samples)
 
     c1 = 100.0 * p1_central
     c2 = 100.0 * p2_central
     c3 = 100.0 * p3_central
 
-    dp1_low = np.maximum(c1 - np.percentile(p1_samples, 16, axis=0), 0.0)
-    dp1_up  = np.maximum(np.percentile(p1_samples, 84, axis=0) - c1, 0.0)
-    dp2_low = np.maximum(c2 - np.percentile(p2_samples, 16, axis=0), 0.0)
-    dp2_up  = np.maximum(np.percentile(p2_samples, 84, axis=0) - c2, 0.0)
-    dp3_low = np.maximum(c3 - np.percentile(p3_samples, 16, axis=0), 0.0)
-    dp3_up  = np.maximum(np.percentile(p3_samples, 84, axis=0) - c3, 0.0)
+    # dp1_low = np.maximum(c1 - np.percentile(p1_samples, 16, axis=0), 0.0)
+    # dp1_up  = np.maximum(np.percentile(p1_samples, 84, axis=0) - c1, 0.0)
+    # dp2_low = np.maximum(c2 - np.percentile(p2_samples, 16, axis=0), 0.0)
+    # dp2_up  = np.maximum(np.percentile(p2_samples, 84, axis=0) - c2, 0.0)
+    # dp3_low = np.maximum(c3 - np.percentile(p3_samples, 16, axis=0), 0.0)
+    # dp3_up  = np.maximum(np.percentile(p3_samples, 84, axis=0) - c3, 0.0)
 
-    return dp1_low, dp1_up, dp2_low, dp2_up, dp3_low, dp3_up
+    p16_1 = np.clip(np.percentile(p1_samples, 16, axis=0), 0.0, 100.0)
+    p84_1 = np.clip(np.percentile(p1_samples, 84, axis=0), 0.0, 100.0)
+    p16_2 = np.clip(np.percentile(p2_samples, 16, axis=0), 0.0, 100.0)
+    p84_2 = np.clip(np.percentile(p2_samples, 84, axis=0), 0.0, 100.0)
+    p16_3 = np.clip(np.percentile(p3_samples, 16, axis=0), 0.0, 100.0)
+    p84_3 = np.clip(np.percentile(p3_samples, 84, axis=0), 0.0, 100.0)
+
+    dp1_low = np.maximum(c1 - p16_1, 0.0)
+    dp1_up  = np.maximum(p84_1 - c1, 0.0)
+    dp2_low = np.maximum(c2 - p16_2, 0.0)
+    dp2_up  = np.maximum(p84_2 - c2, 0.0)
+    dp3_low = np.maximum(c3 - p16_3, 0.0)
+    dp3_up  = np.maximum(p84_3 - c3, 0.0)
+
+    nubar_fit_lo = np.percentile(nubar_fit_samples, 16, axis=0)
+    nubar_fit_hi = np.percentile(nubar_fit_samples, 84, axis=0)
+    sigma_fit_lo = np.percentile(sigma_fit_samples, 16, axis=0)
+    sigma_fit_hi = np.percentile(sigma_fit_samples, 84, axis=0)
+
+    return (
+        dp1_low, dp1_up, dp2_low, dp2_up, dp3_low, dp3_up,
+        nubar_fit_lo, nubar_fit_hi, sigma_fit_lo, sigma_fit_hi,
+    )
 
 
 def extract_multichance_probabilities(
@@ -681,12 +715,15 @@ def extract_multichance_probabilities(
         maxiter=100,
     )
 
-    dp1_low, dp1_up, dp2_low, dp2_up, dp3_low, dp3_up = bootstrap_multichance_uncertainties(
+    (
+        dp1_low, dp1_up, dp2_low, dp2_up, dp3_low, dp3_up,
+        nubar_fit_lo, nubar_fit_hi, sigma_fit_lo, sigma_fit_hi,
+    ) = bootstrap_multichance_uncertainties(
         energy,
         pnu,
         cfg,
         p1, p2, p3,
-        n_boot=10,
+        n_boot=2,
         maxiter=100,
         pnu_err=None,
         n_events=stat,
@@ -756,6 +793,10 @@ def extract_multichance_probabilities(
     df["sigma_exp"] = sigma_exp
     df["nubar_fit"] = nubar_fit
     df["sigma_fit"] = sigma_fit
+    df["nubar_fit_lo"] = nubar_fit_lo
+    df["nubar_fit_hi"] = nubar_fit_hi
+    df["sigma_fit_lo"] = sigma_fit_lo
+    df["sigma_fit_hi"] = sigma_fit_hi
 
     df["b_common"] = cfg.b_238U
     df["c_common"] = cfg.c_238U

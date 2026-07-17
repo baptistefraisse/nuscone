@@ -6,8 +6,7 @@ nuscone/__pycache__/
 
 *.png
 *.pdf
-!docs/images/238U_SCONE_pnu_3d.png
-!docs/images/pnu3d.png
+!docs/images/pnu.png
 !docs/images/scone.png
 
 

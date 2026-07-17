@@ -147,4 +147,12 @@ def load_references(reference_dir: str | Path) -> dict:
         "delta_TKE": cf252[:, 1],
     }
 
+    # 238U B3 model (delta_TKE)
+    u238 = _loadtxt(reference_dir / "b3" / "238U.txt")
+    u238 = np.atleast_2d(u238)
+    refs["U238_B3"] = {
+        "E_exc":     u238[:, 0],
+        "delta_TKE": u238[:, 1],
+    }
+
     return refs

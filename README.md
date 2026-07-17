@@ -8,7 +8,7 @@ Neutron multiplicity analysis for SCONE
       <img src="docs/images/scone.png" width="350">
     </td>
     <td align="center">
-      <img src="docs/images/pnu3d.png" width="320">
+      <img src="docs/images/pnu.png" width="320">
     </td>
   </tr>
 </table>
