@@ -58,7 +58,7 @@ Several observables are derived from $p(\nu)$ as a function of the incident neut
 
 Above the neutron separation energy, fission may occur after one or several pre-fission neutron emissions. Those processes are called multi-chance fission [1]. As a results, the neutron-multiplicity distribution can be written as
 
-$$p(\nu,E)=x_1(E)\,p_1(\nu,E)+x_2(E)\,p_2(\nu,E)+x_3(E)\,p_3(\nu,E) + ... $$
+$$p(\nu,E)=x_1(E)p_1(\nu,E)+x_2(E)p_2(\nu,E)+x_3(E)p_3(\nu,E) + ... $$
 
 where $x_1+x_2+x_3+...=1$ denote the multi-chance fission probabilities. So as to extract those ratios, NUSCONE approximates the individual distributions $p_i$ by a Gaussian form for which centroids and widths are parameterized using linear functions of excitation energy [1].
 
