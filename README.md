@@ -1,7 +1,5 @@
 # NUSCONE : NeUtron analysis for SCONE
 
-Neutron multiplicity analysis for SCONE
-
 <table>
   <tr>
     <td align="center">
@@ -12,6 +10,17 @@ Neutron multiplicity analysis for SCONE
     </td>
   </tr>
 </table>
+
+# Description 
+
+Neutron analysis for SCONE. Extraction of multiplicity distributions and multi-chance fission probabilities.
+
+The analysis is performed in four successive steps:
+
+1. Reconstruction of the neutron-multiplicity distributions $p(\nu)$ 
+2. Calculation of neutron-multiplicity moments ($\bar{\nu}$, $\sigma$, $f_2$, $f_3$)
+3. Extraction of first-, second-, and third-chance fission probabilities
+4. Calculation of the effective excitation energy of the compound system
 
 # Installation
 
@@ -29,22 +38,9 @@ pip install -e ".[dev]"
 nuscone -c configs/u238_default.yaml --plots
 ```
 
-# Objectives
-
-NUSCONE was developed to extract prompt-fission neutron multiplicity distributions from SCONE data and to infer multi-chance fission probabilities.
-
-The analysis is performed in three successive steps:
-
-1. Reconstruction of the neutron-multiplicity distributions $p(\nu)$ 
-2. Calculation of neutron-multiplicity moments ($\bar{\nu}$, $\sigma$, $f_2$, $f_3$)
-3. Extraction of first-, second-, and third-chance fission probabilities
-4. Calculation of the effective excitation energy of the compound system
-
-
 ## 1. Reconstruction of neutron-multiplicity distributions
 
 For each incident neutron energy bin, SCONE measures an experimental multiplicity distribution $Y(\nu)$, where $\nu$ is the number of detected neutrons. The measurement differs from the true distribution $p(\nu)$ due to the SCONE efficiency $\varepsilon$ and the background during the experiment. The SCONE response is modelled by a binomial response matrix, $R$, while the background is encoded in a matrix $B$. The true multiplicity distribution vector $X$ is therefore extracted from $X=AY$, where $A=RB$.
-
 
 Direct inversion of the response matrix is unstable because the problem is ill-conditioned. Instead, NUSCONE relies on a Tikhonov regularization to extract the neutron multiplicity distributions with controlled errors and bias [1].
 
