@@ -1,4 +1,4 @@
-# NUSCONE
+# NUSCONE : NeUtron analysis for SCONE
 
 Neutron multiplicity analysis for SCONE
 
