@@ -22,22 +22,6 @@ The analysis is performed in four successive steps:
 3. Extraction of first-, second-, and third-chance fission probabilities
 4. Calculation of the effective excitation energy of the compound system
 
-# Installation
-
-```bash
-git clone https://github.com/username/NUSCONE.git
-cd NUSCONE
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-```
-
-# Running
-
-```bash
-nuscone -c configs/u238_default.yaml --plots
-```
-
 ## 1. Reconstruction of neutron-multiplicity distributions
 
 For each incident neutron energy bin, SCONE measures an experimental multiplicity distribution $Y(\nu)$, where $\nu$ is the number of detected neutrons. The measurement differs from the true distribution $p(\nu)$ due to the SCONE efficiency $\varepsilon$ and the background during the experiment. The SCONE response is modelled by a binomial response matrix, $R$, while the background is encoded in a matrix $B$. The true multiplicity distribution vector $X$ is therefore extracted from $X=AY$, where $A=RB$.
@@ -68,6 +52,22 @@ The quality of the extracted probabilities is verified through several independe
 Uncertainties are quantified through a bootstrap method.
 
 Multi-chance fission probabilities, $x_1$, $x_2$, and $x_3$, are plotted in _/results/fig_ and saved as CSV files in _/results/tables_.
+
+# Installation
+
+```bash
+git clone https://github.com/username/NUSCONE.git
+cd NUSCONE
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+# Running
+
+```bash
+nuscone -c configs/u238_default.yaml --plots
+```
 
 # Bibliography
 
