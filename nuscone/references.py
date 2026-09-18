@@ -155,4 +155,20 @@ def load_references(reference_dir: str | Path) -> dict:
         "delta_TKE": u238[:, 1],
     }
 
+    # Experimental systematics by Lestone
+
+    systematics = np.genfromtxt(
+        reference_dir / "lestone" / "lestone.csv",
+        delimiter=",",
+        names=True,
+        dtype=None,
+        encoding="utf-8",
+    )
+
+    refs["NUBAR_SIGMA_SYSTEMATICS"] = {
+        "nucleus": systematics["nucleus"],
+        "nubar": systematics["nubar"].astype(float),
+        "sigma": systematics["sigma"].astype(float),
+    }
+
     return refs

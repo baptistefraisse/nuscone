@@ -346,10 +346,17 @@ def plot_sigma_publication(
 
     if references:
         for name, ref in references.items():
-            if "sigma" not in ref:
+            if "sigma" not in ref or "energy" not in ref:
                 continue
+
             model = "GEF" if name == "GEF_PNU" else name
-            plot_model(ax, model, ref["energy"], ref["sigma"], label=name)
+            plot_model(
+                ax,
+                model,
+                ref["energy"],
+                ref["sigma"],
+                label=name,
+            )
 
     errorbar_model(
         ax,
@@ -1049,16 +1056,16 @@ def plot_multichance_excitation_sigma(df, refs=None, sn_en_cf252=8.5, sn_en_cf25
     u238_handle = None
     sqrt_nubar_handle = None
 
-    if refs is not None and "CF252_B3" in refs:
-        from .models import delta_tke_to_sigma, delta_tke_to_sigma_err
-        E_exc_cf = refs["CF252_B3"]["E_exc"]
-        dtke = refs["CF252_B3"]["delta_TKE"]
-        sigma_cf = delta_tke_to_sigma(dtke, sn_en_cf252)
-        sigma_cf_err = delta_tke_to_sigma_err(dtke, sn_en_cf252, sn_en_cf252_err)
-        cf_handle = ax.errorbar(E_exc_cf, sigma_cf, yerr=sigma_cf_err,
-                    fmt="o", color="teal", markersize=12,
-                    elinewidth=4, capsize=5, capthick=3, zorder=12,
-                    label=r"Microscopic calculation $^{252}$Cf")
+    # if refs is not None and "CF252_B3" in refs:
+    #     from .models import delta_tke_to_sigma, delta_tke_to_sigma_err
+    #     E_exc_cf = refs["CF252_B3"]["E_exc"]
+    #     dtke = refs["CF252_B3"]["delta_TKE"]
+    #     sigma_cf = delta_tke_to_sigma(dtke, sn_en_cf252)
+    #     sigma_cf_err = delta_tke_to_sigma_err(dtke, sn_en_cf252, sn_en_cf252_err)
+    #     cf_handle = ax.errorbar(E_exc_cf, sigma_cf, yerr=sigma_cf_err,
+    #                 fmt="o", color="teal", markersize=12,
+    #                 elinewidth=4, capsize=5, capthick=3, zorder=12,
+    #                 label=r"Microscopic calculation $^{252}$Cf")
 
     if refs is not None and "U238_B3" in refs:
         from .models import delta_tke_to_sigma, delta_tke_to_sigma_err
@@ -1066,7 +1073,7 @@ def plot_multichance_excitation_sigma(df, refs=None, sn_en_cf252=8.5, sn_en_cf25
         dtke_u238 = refs["U238_B3"]["delta_TKE"]
         sigma_u238 = delta_tke_to_sigma(dtke_u238, sn_en_238u)
         sigma_u238_err = delta_tke_to_sigma_err(dtke_u238, sn_en_238u, sn_en_238u_err)
-        u238_handle = ax.errorbar(E_exc_u238[0], sigma_u238[0], yerr=sigma_u238_err[0],
+        u238_handle = ax.errorbar(E_exc_u238, sigma_u238, yerr=sigma_u238_err,
                     fmt="*", color="blue", markersize=12,
                     elinewidth=3, capsize=5, capthick=3, zorder=12,
                     label=r"Microscopic calculation $^{238}$U")
@@ -1103,7 +1110,7 @@ def plot_multichance_excitation_sigma(df, refs=None, sn_en_cf252=8.5, sn_en_cf25
             linestyle="--",
             linewidth=3,
             zorder=9,
-            label=r"Statistical evolution model $\propto \sqrt{\bar{\nu}}$",
+            label=r"Phenomenological model Eq. (20)",
         )
 
         # Propagate the two extremities of the theoretical error bar
@@ -1185,4 +1192,272 @@ def plot_multichance_excitation_sigma(df, refs=None, sn_en_cf252=8.5, sn_en_cf25
     ax.set_xlim(-0.5,20.5)
     ax.set_xticks([0,5,10,15,20])
     ax.set_yticks([1.0, 1.2, 1.4])
+    return fig, ax
+
+def plot_multichance_nubar_sigma(
+    df,
+    refs=None,
+    emax=18,
+    figsize=(10, 10),
+    show_labels=False,
+):
+    setup_publication_style()
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # ------------------------------------------------------------
+    # SCONE data
+    # ------------------------------------------------------------
+
+    mask = df["energy"].to_numpy() <= emax
+
+    energy = df["energy"].to_numpy()[mask]
+    nubar_exp = df["nubar_exp"].to_numpy()[mask]
+    sigma_exp = df["sigma_exp"].to_numpy()[mask]
+
+    nubar_err = (
+        df["nubar_err"].to_numpy()[mask]
+        if "nubar_err" in df.columns
+        else None
+    )
+
+    sigma_err = (
+        df["sigma_err"].to_numpy()[mask]
+        if "sigma_err" in df.columns
+        else None
+    )
+
+    p2 = df["p2"].to_numpy()[mask]
+    p3 = df["p3"].to_numpy()[mask]
+
+    # Average number of pre-fission neutrons
+    #
+    # first chance  -> 0
+    # second chance -> 1
+    # third chance  -> 2
+    #
+    nubar_prefission = (p2 + 2.0 * p3) / 100.0
+
+    # Average neutron multiplicity attributed to fragment de-excitation
+    nubar_frag = nubar_exp - nubar_prefission
+
+    # ------------------------------------------------------------
+    # Anchor to the SCONE point with the lowest fragment multiplicity
+    # ------------------------------------------------------------
+
+    idx0 = np.argmin(nubar_frag)
+
+    nubar_frag_0 = nubar_frag[idx0]
+    sigma_0 = sigma_exp[idx0]
+
+    if sigma_err is not None:
+        sigma_0_err = sigma_err[idx0]
+    else:
+        sigma_0_err = 0.0
+
+    # ------------------------------------------------------------
+    # Lestone reference nuclei
+    # ------------------------------------------------------------
+
+    systematics_handles = []
+    systematics_labels = []
+
+    if refs is not None and "NUBAR_SIGMA_SYSTEMATICS" in refs:
+        ref_sys = refs["NUBAR_SIGMA_SYSTEMATICS"]
+
+        cmap = plt.get_cmap("tab20")
+        colors = [cmap(i) for i in range(len(ref_sys["nubar"]))]
+
+        for i, (nucleus, x, y) in enumerate(
+            zip(
+                ref_sys["nucleus"],
+                ref_sys["nubar"],
+                ref_sys["sigma"],
+            )
+        ):
+            nucleus = str(nucleus)
+
+            if "_SF" in nucleus:
+                isotope = nucleus.replace("_SF", "")
+                reaction = r"s.f."
+
+            elif "_nthf" in nucleus:
+                isotope = nucleus.replace("_nthf", "")
+                reaction = r"n$_{\rm th}$,f"
+
+            else:
+                isotope = nucleus
+                reaction = ""
+
+            mass = "".join(c for c in isotope if c.isdigit())
+            element = "".join(c for c in isotope if c.isalpha())
+
+            if reaction:
+                label = (
+                    rf"$^{{{mass}}}$"
+                    rf"$\mathrm{{{element}}}$"
+                    rf" ({reaction})"
+                )
+            else:
+                label = (
+                    rf"$^{{{mass}}}$"
+                    rf"$\mathrm{{{element}}}$"
+                )
+
+            h, = ax.plot(
+                x,
+                y,
+                linestyle="none",
+                marker="o",
+                color=colors[i],
+                markersize=9,
+                zorder=5,
+                label=label,
+            )
+
+            systematics_handles.append(h)
+            systematics_labels.append(label)
+
+    # ------------------------------------------------------------
+    # SCONE
+    # ------------------------------------------------------------
+
+    scone_handle = errorbar_model(
+        ax,
+        "SCONE",
+        nubar_frag,
+        sigma_exp,
+        xerr=nubar_err,
+        yerr=sigma_err,
+        label=r"SCONE $^{238}$U(n$_{\rm fast}$,f)",
+        linestyle="none",
+        linewidth=2,
+        markersize=7,
+        capsize=3,
+        zorder=10,
+    )
+
+    # ------------------------------------------------------------
+    # Phenomenological cumulative-variance scaling
+    #
+    # sigma_nu^2 / sigma_nu,0^2
+    #     = nubar_frag / nubar_frag,0
+    #
+    # i.e.
+    #
+    # sigma_nu
+    #     = sigma_nu,0 * sqrt(nubar_frag / nubar_frag,0)
+    #
+    # The normalization is anchored to the lowest-energy SCONE point.
+    # ------------------------------------------------------------
+
+    model_handle = None
+    model_band = None
+
+    if len(nubar_frag) > 0:
+
+        # Range of the phenomenological curve
+        xmin = 2.0
+        xmax = 5.0
+
+        nubar_grid = np.linspace(xmin, xmax, 300)
+
+        scaling = np.sqrt(
+            nubar_grid / nubar_frag_0
+        )
+
+        # Central scaling
+        sigma_model = sigma_0 * scaling
+
+        # Error band propagated from sigma_0 only
+        sigma_model_low = (
+            sigma_0 - sigma_0_err
+        ) * scaling
+
+        sigma_model_high = (
+            sigma_0 + sigma_0_err
+        ) * scaling
+
+        model_band = ax.fill_between(
+            nubar_grid,
+            sigma_model_low,
+            sigma_model_high,
+            color="grey",
+            alpha=0.25,
+            linewidth=0,
+            zorder=7,
+        )
+
+        model_handle, = ax.plot(
+            nubar_grid,
+            sigma_model,
+            color="black",
+            linestyle="--",
+            linewidth=3,
+            zorder=8,
+            label=r"Phenomenological scaling of Eq. (18)",
+        )
+
+    # ------------------------------------------------------------
+    # Axes
+    # ------------------------------------------------------------
+
+    ax.set_xlabel(
+        r"$\bar{\nu}_{\rm frag}$",
+        fontsize=PLOT_STYLE["label_size"],
+    )
+
+    ax.set_ylabel(
+        r"$\sigma_\nu$",
+        fontsize=PLOT_STYLE["label_size"],
+    )
+
+    # ------------------------------------------------------------
+    # Legends
+    # ------------------------------------------------------------
+
+    if systematics_handles:
+        lestone_legend = ax.legend(
+            systematics_handles,
+            systematics_labels,
+            loc="upper left",
+            frameon=False,
+            fontsize=22,
+            ncol=3,
+            handlelength=1.6,
+            borderpad=0.2,
+            labelspacing=0.4,
+        )
+        ax.add_artist(lestone_legend)
+
+    model_handles = [scone_handle]
+    model_labels = [scone_handle.get_label()]
+
+    if model_handle is not None:
+        model_handles.append(model_handle)
+        model_labels.append(model_handle.get_label())
+
+    ax.legend(
+        model_handles,
+        model_labels,
+        loc="lower right",
+        frameon=False,
+        fontsize=PLOT_STYLE["legend_size"],
+        handlelength=1.6,
+        borderpad=0.2,
+        labelspacing=0.4,
+    )
+
+    # ------------------------------------------------------------
+    # Final formatting
+    # ------------------------------------------------------------
+
+    polish_axes(ax)
+
+    ax.set_xlim(2.3, 4.1)
+    ax.set_ylim(0.7, 1.7)
+    ax.set_yticks([1.0, 1.2, 1.4, 1.6])
+    ax.set_xticks([2.5, 3.0, 3.5, 4.0])
+
+    fig.tight_layout()
+
     return fig, ax

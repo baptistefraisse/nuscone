@@ -32,6 +32,7 @@ def main() -> None:
             plot_multichance_sigma,
             plot_multichance_probabilities,
             plot_multichance_excitation_sigma,
+            plot_multichance_nubar_sigma,
             savefig,
         )
 
@@ -184,6 +185,19 @@ def main() -> None:
         ]
         fig, _ = plot_multichance_excitation_sigma(multichance, refs=refs, thermal_points=thermal_points)
         savefig(fig, config.paths.output_dir / "figures" / "238U_SCONE_excitation_sigma.pdf")
+
+        # sigma versus corrected nubar
+
+        fig, _ = plot_multichance_nubar_sigma(
+            multichance,
+            refs=refs,
+            emax=18,
+        )
+
+        savefig(
+            fig,
+            config.paths.output_dir / "figures" / "238U_SCONE_nubar_sigma.pdf",
+        )
 
 
 if __name__ == "__main__":
