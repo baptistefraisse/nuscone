@@ -30,9 +30,9 @@ def main() -> None:
             plot_multichance_pnu_fit,
             plot_multichance_moments,
             plot_multichance_sigma,
-            plot_multichance_probabilities,
             plot_multichance_excitation_sigma,
             plot_multichance_nubar_sigma,
+            plot_sigma_freya_c_publication,
             savefig,
         )
 
@@ -199,6 +199,22 @@ def main() -> None:
             config.paths.output_dir / "figures" / "238U_SCONE_nubar_sigma.pdf",
         )
 
+        # sigma FREYA-c scanning
+
+        fig, _ = plot_sigma_freya_c_publication(
+            moments["energy"].to_numpy(),
+            moments["sigma"].to_numpy(),
+            sigma_err=moments["sigma_err"].to_numpy(),
+            energy_err=moments["energy_err"].to_numpy(),
+            references=refs,
+        )
+
+        savefig(
+            fig,
+            config.paths.output_dir
+            / "figures"
+            / "238U_SCONE_sigma_FREYA-c.pdf",
+        )
 
 if __name__ == "__main__":
     main()

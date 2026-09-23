@@ -1,10 +1,15 @@
 from pathlib import Path
-
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import gridspec
+from matplotlib.colors import LinearSegmentedColormap
 from .multichance import model_components, read_pnu_table, MultiChanceConfig, load_multichance_reference_data
 from .references import load_references
+
+
+#------------------------------------------------------------
+# Global plots parameters
+#------------------------------------------------------------
 
 
 MODEL_STYLES = {
@@ -21,6 +26,17 @@ MODEL_STYLES = {
     },
     "GEF": {
         "color": "black",
+        "marker": None,
+        "markersize": 7,
+        "linewidth": 5,
+        "linestyle": "-",
+        "capsize": 0,
+        "elinewidth": 2,
+        "capthick": 2,
+        "zorder": 2,
+    },
+    "FREYA": {
+        "color": "green",
         "marker": None,
         "markersize": 7,
         "linewidth": 5,
@@ -107,13 +123,21 @@ def _model_name(name):
     aliases = {
         "work": "SCONE",
         "gef": "GEF",
+        "freya": "FREYA",
         "cgmf": "CGMF",
         "jeff": "JEFF",
         "endf": "ENDF",
         "frehaut": "FREHAUT",
         "GEF_PNU": "GEF",
+        "FREYA_PNU": "FREYA",
+        "CGMF_PNU": "CGMF",
     }
     return aliases.get(name, name)
+
+
+#------------------------------------------------------------
+# Global plots functions
+#------------------------------------------------------------
 
 
 def _style(name):
@@ -215,6 +239,11 @@ def savefig(fig, path):
     fig.savefig(path, dpi=300, transparent=False, bbox_inches="tight")
 
 
+#------------------------------------------------------------
+# Neutron-mult. viz.
+#------------------------------------------------------------
+
+
 def plot_nubar_publication(
     energies,
     nubar,
@@ -259,6 +288,10 @@ def plot_nubar_publication(
             ref = references["CGMF"]
             plot_model(ax_up, "CGMF", ref["energy"], ref["nubar"], label="CGMF")
 
+        if "FREYA" in references:
+            ref = references["FREYA"]
+            plot_model(ax_up, "FREYA", ref["energy"], ref["nubar"], label="FREYA")
+
     errorbar_model(
         ax_up,
         "SCONE",
@@ -271,7 +304,7 @@ def plot_nubar_publication(
     )
 
     if references:
-        for name in ["JEFF", "GEF", "CGMF"]:
+        for name in ["JEFF", "GEF", "CGMF", "FREYA"]:
             if name not in references:
                 continue
 
@@ -349,7 +382,15 @@ def plot_sigma_publication(
             if "sigma" not in ref or "energy" not in ref:
                 continue
 
-            model = "GEF" if name == "GEF_PNU" else name
+            if name == "GEF_PNU":
+                model = "GEF"
+            elif name == "FREYA_PNU":
+                model = "FREYA"
+            elif name == "CGMF_PNU":
+                model = "CGMF"
+            else:
+                model = name
+
             plot_model(
                 ax,
                 model,
@@ -472,6 +513,10 @@ def plot_pnu_publication(
         for name, values in references.items():
             model = "GEF" if name == "GEF_PNU" else name
             label = "GEF" if name == "GEF_PNU" else name
+            model = "FREYA" if name == "FREYA_PNU" else model
+            label = "FREYA" if name == "FREYA_PNU" else label
+            model = "CGMF" if name == "CGMF_PNU" else model
+            label = "CGMF" if name == "CGMF_PNU" else label
             plot_model(ax, model, bins, values, label=label)
 
     errorbar_model(
@@ -502,6 +547,11 @@ def plot_pnu_publication(
     return fig, ax
 
 
+#------------------------------------------------------------
+# Regularization parameter viz.
+#------------------------------------------------------------
+
+
 def plot_lambda_publication(energies, lambdas):
     setup_publication_style()
 
@@ -527,6 +577,11 @@ def plot_lambda_publication(energies, lambdas):
     return fig, ax
 
 
+#------------------------------------------------------------
+# Pnu vizualization (publication)
+#------------------------------------------------------------
+
+
 def plot_pnu_triptych_publication(
     energies_to_plot,
     all_energies,
@@ -549,9 +604,27 @@ def plot_pnu_triptych_publication(
         idx = list(all_energies).index(float(energy))
 
         if references is not None and "GEF_PNU" in references:
+
+            # CGMF
+
+            cgmf_e = references["CGMF_PNU"]["energy"]
+            cgmf_pnu = references["CGMF_PNU"]["pnu"]
+            idx_cgmf = np.argmin(np.abs(cgmf_e - energy))
+            nu = np.arange(cgmf_pnu.shape[1])
+
+            plot_model(
+                ax,
+                "CGMF",
+                nu,
+                cgmf_pnu[idx_cgmf],
+                label="CGMF" if ax is axes[0] else None,
+                linewidth=3,
+            )
+
+            # GEF
+
             gef_e = references["GEF_PNU"]["energy"]
             gef_pnu = references["GEF_PNU"]["pnu"]
-
             idx_gef = np.argmin(np.abs(gef_e - energy))
             nu = np.arange(gef_pnu.shape[1])
 
@@ -561,6 +634,22 @@ def plot_pnu_triptych_publication(
                 nu,
                 gef_pnu[idx_gef],
                 label="GEF" if ax is axes[0] else None,
+                linewidth=3,
+            )
+
+            # FREYA
+
+            freya_e = references["FREYA_PNU"]["energy"]
+            freya_pnu = references["FREYA_PNU"]["pnu"]
+            idx_freya = np.argmin(np.abs(freya_e - energy))
+            nu = np.arange(freya_pnu.shape[1])
+
+            plot_model(
+                ax,
+                "FREYA",
+                nu,
+                freya_pnu[idx_freya],
+                label="FREYA" if ax is axes[0] else None,
                 linewidth=3,
             )
 
@@ -598,7 +687,7 @@ def plot_pnu_triptych_publication(
         if ax is axes[0]:
             ax.legend(
                 loc="lower left",
-                bbox_to_anchor=(0.4, 0.50),
+                bbox_to_anchor=(0.4, 0.3),
                 frameon=False,
                 fontsize=PLOT_STYLE["panel_text_size"],
                 handlelength=1.4,
@@ -618,8 +707,12 @@ def plot_pnu_triptych_publication(
     return fig, axes
 
 
+#------------------------------------------------------------
+# Pnu 3D viz.
+#------------------------------------------------------------
+
+
 def plot_pnu_3d(energies, pnu, figsize=(12, 9)):
-    from matplotlib.colors import LinearSegmentedColormap
 
     biopunk_cmap = LinearSegmentedColormap.from_list(
         "biopunk",
@@ -687,7 +780,9 @@ def plot_pnu_3d(energies, pnu, figsize=(12, 9)):
     return fig, ax
 
 
-# multichance plots
+#------------------------------------------------------------
+# Fits for multichance extraction viz.
+#------------------------------------------------------------
 
 
 def plot_multichance_pnu_fit(df, pnu_path, chosen_index=9, cfg=None):
@@ -906,6 +1001,12 @@ def plot_multichance_sigma(df):
 
     return fig, ax
 
+
+#------------------------------------------------------------
+# Multichance viz.
+#------------------------------------------------------------
+
+
 def plot_multichance_probabilities(df, reference_dir=Path("data/references")):
 
     setup_publication_style()
@@ -914,6 +1015,7 @@ def plot_multichance_probabilities(df, reference_dir=Path("data/references")):
 
     gef_ref = refs["GEF_MULTICHANCE"]
     cgmf_ref = refs["CGMF_MULTICHANCE"]
+    freya_ref = refs["FREYA_MULTICHANCE"]
 
     fig, axes = plt.subplots(
         1,
@@ -934,6 +1036,7 @@ def plot_multichance_probabilities(df, reference_dir=Path("data/references")):
 
     e_gef = gef_ref["energy"]
     e_cgmf = cgmf_ref["energy"]
+    e_freya = freya_ref["energy"]
 
     gef = [
         gef_ref["p1"],
@@ -949,8 +1052,15 @@ def plot_multichance_probabilities(df, reference_dir=Path("data/references")):
         #cgmf_ref["p4"] if "p4" in cgmf_ref else np.zeros_like(e_cgmf),
     ]
 
-    for i, (ax, text, col, gef_i, cgmf_i) in enumerate(
-        zip(axes, panel_labels, scone_cols, gef, cgmf)
+    freya = [
+        freya_ref["p1"],
+        freya_ref["p2"],
+        freya_ref["p3"],
+        #freya_ref["p4"] if "p4" in freya_ref else np.zeros_like(e_freya),
+    ]
+
+    for i, (ax, text, col, gef_i, cgmf_i, freya_i) in enumerate(
+        zip(axes, panel_labels, scone_cols, gef, cgmf, freya)
     ):
 
         plot_model(
@@ -968,6 +1078,15 @@ def plot_multichance_probabilities(df, reference_dir=Path("data/references")):
             e_cgmf,
             cgmf_i,
             label="CGMF" if i == 2 else None,
+            linewidth=4,
+        )
+
+        plot_model(
+            ax,
+            "FREYA",
+            e_freya,
+            freya_i,
+            label="FREYA" if i == 2 else None,
             linewidth=4,
         )
 
@@ -1039,7 +1158,22 @@ def plot_multichance_probabilities(df, reference_dir=Path("data/references")):
     return fig, axes
 
 
-def plot_multichance_excitation_sigma(df, refs=None, sn_en_cf252=8.5, sn_en_cf252_err=0.5, sn_en_238u=8.5, sn_en_238u_err=0.5, emax=18, figsize=(10, 10), thermal_points=None):
+#------------------------------------------------------------
+# sigma_nu vs. E_ex viw.
+#------------------------------------------------------------
+
+
+def plot_multichance_excitation_sigma(
+    df, 
+    refs=None, 
+    sn_en_cf252=8.5, 
+    sn_en_cf252_err=0.5, 
+    sn_en_238u=8.5, 
+    sn_en_238u_err=0.5, 
+    emax=18, 
+    figsize=(10, 10),
+    thermal_points=None
+):
     setup_publication_style()
     fig, ax = plt.subplots(figsize=figsize)
 
@@ -1068,6 +1202,7 @@ def plot_multichance_excitation_sigma(df, refs=None, sn_en_cf252=8.5, sn_en_cf25
     #                 label=r"Microscopic calculation $^{252}$Cf")
 
     if refs is not None and "U238_B3" in refs:
+
         from .models import delta_tke_to_sigma, delta_tke_to_sigma_err
         E_exc_u238 = refs["U238_B3"]["E_exc"]
         dtke_u238 = refs["U238_B3"]["delta_TKE"]
@@ -1089,18 +1224,15 @@ def plot_multichance_excitation_sigma(df, refs=None, sn_en_cf252=8.5, sn_en_cf25
     )
 
     sqrt_nubar_band = None
+
     if sqrt_nubar_anchor is not None:
+
         E_exc_grid = np.linspace(0.0, 20, 300)
 
-        # Simple model for the average neutron multiplicity
         nubar_0 = 2.5
         dnubar_dE = 0.1
         nubar_model = nubar_0 + dnubar_dE * E_exc_grid
-
-        # Evolution law normalized to 1 at E_exc = 0
         scaling = np.sqrt(nubar_model / nubar_0)
-
-        # Central theoretical prediction
         sigma_model = sqrt_nubar_anchor * scaling
 
         sqrt_nubar_handle, = ax.plot(
@@ -1113,8 +1245,8 @@ def plot_multichance_excitation_sigma(df, refs=None, sn_en_cf252=8.5, sn_en_cf25
             label=r"Phenomenological model Eq. (20)",
         )
 
-        # Propagate the two extremities of the theoretical error bar
         if sqrt_nubar_anchor_err is not None:
+
             sigma_model_low = (
                 sqrt_nubar_anchor - sqrt_nubar_anchor_err
             ) * scaling
@@ -1165,7 +1297,6 @@ def plot_multichance_excitation_sigma(df, refs=None, sn_en_cf252=8.5, sn_en_cf25
         fontsize=PLOT_STYLE["label_size"],
     )
 
-    # Experimental values: SCONE sigma + thermal isotopes (upper left)
     exp_handles = [scone_handle] + thermal_handles
     exp_labels = [scone_handle.get_label()] + thermal_labels
     exp_legend = ax.legend(
@@ -1176,7 +1307,6 @@ def plot_multichance_excitation_sigma(df, refs=None, sn_en_cf252=8.5, sn_en_cf25
     )
     ax.add_artist(exp_legend)
 
-    # Models: sqrt(nubar) fit, microscopic 238U, microscopic 252Cf (lower right)
     model_handles = [h for h in [cf_handle, u238_handle, sqrt_nubar_handle] if h is not None]
     model_labels = [h.get_label() for h in model_handles]
     ax.legend(
@@ -1194,22 +1324,32 @@ def plot_multichance_excitation_sigma(df, refs=None, sn_en_cf252=8.5, sn_en_cf25
     ax.set_yticks([1.0, 1.2, 1.4])
     return fig, ax
 
+
+#------------------------------------------------------------
+# sigma_nu vs. nubar_frag
+#------------------------------------------------------------
+
+
 def plot_multichance_nubar_sigma(
     df,
     refs=None,
     emax=18,
-    figsize=(10, 10),
+    figsize=(10.5, 5.2),
     show_labels=False,
 ):
     setup_publication_style()
-    fig, ax = plt.subplots(figsize=figsize)
 
-    # ------------------------------------------------------------
-    # SCONE data
-    # ------------------------------------------------------------
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=figsize,
+        sharey=True,
+        constrained_layout=False,
+    )
+
+    ax_exp, ax_models = axes
 
     mask = df["energy"].to_numpy() <= emax
-
     energy = df["energy"].to_numpy()[mask]
     nubar_exp = df["nubar_exp"].to_numpy()[mask]
     sigma_exp = df["sigma_exp"].to_numpy()[mask]
@@ -1228,21 +1368,8 @@ def plot_multichance_nubar_sigma(
 
     p2 = df["p2"].to_numpy()[mask]
     p3 = df["p3"].to_numpy()[mask]
-
-    # Average number of pre-fission neutrons
-    #
-    # first chance  -> 0
-    # second chance -> 1
-    # third chance  -> 2
-    #
     nubar_prefission = (p2 + 2.0 * p3) / 100.0
-
-    # Average neutron multiplicity attributed to fragment de-excitation
     nubar_frag = nubar_exp - nubar_prefission
-
-    # ------------------------------------------------------------
-    # Anchor to the SCONE point with the lowest fragment multiplicity
-    # ------------------------------------------------------------
 
     idx0 = np.argmin(nubar_frag)
 
@@ -1254,14 +1381,65 @@ def plot_multichance_nubar_sigma(
     else:
         sigma_0_err = 0.0
 
-    # ------------------------------------------------------------
-    # Lestone reference nuclei
-    # ------------------------------------------------------------
+    xmin = 2.0
+    xmax = 5.0
+
+    nubar_grid = np.linspace(xmin, xmax, 300)
+
+    scaling = np.sqrt(
+        nubar_grid / nubar_frag_0
+    )
+
+    sigma_scaling = sigma_0 * scaling
+
+    sigma_scaling_low = (
+        sigma_0 - sigma_0_err
+    ) * scaling
+
+    sigma_scaling_high = (
+        sigma_0 + sigma_0_err
+    ) * scaling
+
+    scone_handles = []
+    scaling_handles = []
+
+    for ax in axes:
+
+        scone_handle = errorbar_model(
+            ax,
+            "SCONE",
+            nubar_frag,
+            sigma_exp,
+            xerr=nubar_err,
+            yerr=sigma_err,
+            label=r"SCONE $^{238}$U(n$_{\rm fast}$,f)",
+            linestyle="none",
+            linewidth=2,
+            markersize=4,
+            capsize=3,
+            zorder=10,
+        )
+
+        fano_factor = sigma_0**2 / nubar_frag_0
+
+        scaling_handle, = ax.plot(
+            nubar_grid,
+            sigma_scaling,
+            color="darkred",
+            linestyle="--",
+            linewidth=4,
+            zorder=8,
+            label=rf"Scaling of Eq. (16), $F={fano_factor:.2f}$",
+        )
+
+        scone_handles.append(scone_handle)
+        scaling_handles.append(scaling_handle)
 
     systematics_handles = []
     systematics_labels = []
 
     if refs is not None and "NUBAR_SIGMA_SYSTEMATICS" in refs:
+
         ref_sys = refs["NUBAR_SIGMA_SYSTEMATICS"]
 
         cmap = plt.get_cmap("tab20")
@@ -1274,6 +1452,7 @@ def plot_multichance_nubar_sigma(
                 ref_sys["sigma"],
             )
         ):
+
             nucleus = str(nucleus)
 
             if "_SF" in nucleus:
@@ -1303,13 +1482,13 @@ def plot_multichance_nubar_sigma(
                     rf"$\mathrm{{{element}}}$"
                 )
 
-            h, = ax.plot(
+            h, = ax_exp.plot(
                 x,
                 y,
                 linestyle="none",
                 marker="o",
                 color=colors[i],
-                markersize=9,
+                markersize=8,
                 zorder=5,
                 label=label,
             )
@@ -1317,147 +1496,305 @@ def plot_multichance_nubar_sigma(
             systematics_handles.append(h)
             systematics_labels.append(label)
 
-    # ------------------------------------------------------------
-    # SCONE
-    # ------------------------------------------------------------
+    theory_handles = []
 
-    scone_handle = errorbar_model(
-        ax,
-        "SCONE",
-        nubar_frag,
-        sigma_exp,
-        xerr=nubar_err,
-        yerr=sigma_err,
-        label=r"SCONE $^{238}$U(n$_{\rm fast}$,f)",
-        linestyle="none",
-        linewidth=2,
-        markersize=7,
-        capsize=3,
-        zorder=10,
-    )
+    if refs is not None:
 
-    # ------------------------------------------------------------
-    # Phenomenological cumulative-variance scaling
-    #
-    # sigma_nu^2 / sigma_nu,0^2
-    #     = nubar_frag / nubar_frag,0
-    #
-    # i.e.
-    #
-    # sigma_nu
-    #     = sigma_nu,0 * sqrt(nubar_frag / nubar_frag,0)
-    #
-    # The normalization is anchored to the lowest-energy SCONE point.
-    # ------------------------------------------------------------
+        model_pairs = [
+            ("GEF",   "GEF",   "GEF_MULTICHANCE"),
+            ("FREYA", "FREYA", "FREYA_MULTICHANCE"),
+            ("CGMF",  "CGMF",  "CGMF_MULTICHANCE"),
+        ]
 
-    model_handle = None
-    model_band = None
+        for model, moment_key, multich_key in model_pairs:
 
-    if len(nubar_frag) > 0:
+            if moment_key not in refs or multich_key not in refs:
+                continue
 
-        # Range of the phenomenological curve
-        xmin = 2.0
-        xmax = 5.0
+            ref = refs[moment_key]
+            ref_mc = refs[multich_key]
 
-        nubar_grid = np.linspace(xmin, xmax, 300)
+            e_model = np.asarray(ref["energy"], dtype=float)
+            nubar_model = np.asarray(ref["nubar"], dtype=float)
+            sigma_model = np.asarray(ref["sigma"], dtype=float)
 
-        scaling = np.sqrt(
-            nubar_grid / nubar_frag_0
-        )
+            mask_model = e_model <= emax
 
-        # Central scaling
-        sigma_model = sigma_0 * scaling
+            e_model = e_model[mask_model]
+            nubar_model = nubar_model[mask_model]
+            sigma_model = sigma_model[mask_model]
 
-        # Error band propagated from sigma_0 only
-        sigma_model_low = (
-            sigma_0 - sigma_0_err
-        ) * scaling
+            order = np.argsort(e_model)
 
-        sigma_model_high = (
-            sigma_0 + sigma_0_err
-        ) * scaling
+            e_model = e_model[order]
+            nubar_model = nubar_model[order]
+            sigma_model = sigma_model[order]
 
-        model_band = ax.fill_between(
-            nubar_grid,
-            sigma_model_low,
-            sigma_model_high,
-            color="grey",
-            alpha=0.25,
-            linewidth=0,
-            zorder=7,
-        )
+            e_mc = np.asarray(ref_mc["energy"], dtype=float)
+            p2_mc = np.asarray(ref_mc["p2"], dtype=float)
+            p3_mc = np.asarray(ref_mc["p3"], dtype=float)
 
-        model_handle, = ax.plot(
-            nubar_grid,
-            sigma_model,
-            color="black",
-            linestyle="--",
-            linewidth=3,
-            zorder=8,
-            label=r"Phenomenological scaling of Eq. (18)",
-        )
+            mc_order = np.argsort(e_mc)
 
-    # ------------------------------------------------------------
-    # Axes
-    # ------------------------------------------------------------
+            e_mc = e_mc[mc_order]
+            p2_mc = p2_mc[mc_order]
+            p3_mc = p3_mc[mc_order]
 
-    ax.set_xlabel(
-        r"$\bar{\nu}_{\rm frag}$",
-        fontsize=PLOT_STYLE["label_size"],
-    )
+            p2_model = np.interp(e_model, e_mc, p2_mc)
+            p3_model = np.interp(e_model, e_mc, p3_mc)
 
-    ax.set_ylabel(
-        r"$\sigma_\nu$",
-        fontsize=PLOT_STYLE["label_size"],
-    )
+            nubar_prefission_model = (
+                p2_model + 2.0 * p3_model
+            ) / 100.0
 
-    # ------------------------------------------------------------
-    # Legends
-    # ------------------------------------------------------------
+            nubar_frag_model = (
+                nubar_model - nubar_prefission_model
+            )
+
+            order = np.argsort(nubar_frag_model)
+
+            x = nubar_frag_model[order]
+            y = sigma_model[order]
+
+            h, = ax_models.plot(
+                x,
+                y,
+                color=_style(model)["color"],
+                linestyle="-",
+                linewidth=4,
+                zorder=5,
+                label=model,
+            )
+
+            theory_handles.append(h)
 
     if systematics_handles:
-        lestone_legend = ax.legend(
+
+        exp_legend = ax_exp.legend(
             systematics_handles,
             systematics_labels,
             loc="upper left",
             frameon=False,
-            fontsize=22,
+            fontsize=13,
             ncol=3,
-            handlelength=1.6,
+            handlelength=1.2,
+            borderpad=0.2,
+            labelspacing=0.35,
+            columnspacing=0.8,
+        )
+
+        ax_exp.add_artist(exp_legend)
+
+    ax_exp.legend(
+        [
+            scone_handles[0],
+            scaling_handles[0],
+        ],
+        [
+            scone_handles[0].get_label(),
+            scaling_handles[0].get_label(),
+        ],
+        loc="lower right",
+        frameon=False,
+        fontsize=18,
+        handlelength=1.5,
+        borderpad=0.2,
+        labelspacing=0.4,
+    )
+
+    if theory_handles:
+
+        theory_labels = [h.get_label() for h in theory_handles]
+        theory_legend = ax_models.legend(
+            theory_handles,
+            theory_labels,
+            loc="upper left",
+            frameon=False,
+            fontsize=15,
+            handlelength=1.5,
             borderpad=0.2,
             labelspacing=0.4,
         )
-        ax.add_artist(lestone_legend)
+        ax_models.add_artist(theory_legend)
 
-    model_handles = [scone_handle]
-    model_labels = [scone_handle.get_label()]
+    scone_model_handles = [
+        scone_handles[1],
+        scaling_handles[1],
+    ]
 
-    if model_handle is not None:
-        model_handles.append(model_handle)
-        model_labels.append(model_handle.get_label())
+    scone_model_labels = [
+        h.get_label() for h in scone_model_handles
+    ]
 
-    ax.legend(
-        model_handles,
-        model_labels,
+    ax_models.legend(
+        scone_model_handles,
+        scone_model_labels,
         loc="lower right",
         frameon=False,
+        fontsize=18,
+        handlelength=1.5,
+        borderpad=0.2,
+        labelspacing=0.4,
+    )
+
+    for ax in axes:
+
+        ax.set_xlim(2.3, 4.1)
+        ax.set_ylim(0.7, 1.7)
+        ax.set_xticks([2.5, 3.0, 3.5, 4.0])
+        ax.set_yticks([1.0, 1.2, 1.4, 1.6])
+
+        polish_axes(
+            ax,
+            tick_size=22,
+            spine_width=1.8,
+        )
+
+    axes[0].set_ylabel(
+        r"$\sigma_\nu$",
+        fontsize=22,
+    )
+
+    axes[0].set_xlabel(
+        r"$\bar{\nu}_{\rm frag}$",
+        fontsize=22,
+    )
+
+    axes[1].set_xlabel(
+        r"$\bar{\nu}_{\rm frag}$",
+        fontsize=22,
+    )
+
+    # fig.supxlabel(
+    #     r"$\bar{\nu}_{\rm frag}$",
+    #     fontsize=22,
+    #     y=0.06,
+    # )
+
+    if show_labels:
+
+        ax_exp.text(
+            0.05,
+            0.95,
+            "(a)",
+            transform=ax_exp.transAxes,
+            ha="left",
+            va="top",
+            fontsize=PLOT_STYLE["panel_text_size"],
+        )
+
+        ax_models.text(
+            0.05,
+            0.95,
+            "(b)",
+            transform=ax_models.transAxes,
+            ha="left",
+            va="top",
+            fontsize=PLOT_STYLE["panel_text_size"],
+        )
+
+    fig.subplots_adjust(
+        left=0.11,
+        right=0.98,
+        bottom=0.18,
+        top=0.97,
+        wspace=0.06,
+    )
+
+    return fig, axes
+
+
+# ------------------------------------------------------------
+# FREYA parameter c
+# ------------------------------------------------------------
+
+
+def plot_sigma_freya_c_publication(
+    energies,
+    sigma,
+    sigma_err=None,
+    energy_err=None,
+    references=None,
+    figsize=(10, 10),
+):
+    setup_publication_style()
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    if references is None or "FREYA_C_SCAN" not in references:
+        raise KeyError(
+            "FREYA_C_SCAN not found in references. "
+            "Check load_references() and the FREYA c-scan files."
+        )
+
+    freya_scan = references["FREYA_C_SCAN"]
+
+    c_values = sorted(freya_scan.keys())
+
+    cmap = plt.get_cmap("Greens")
+    colors = cmap(np.linspace(0.35, 0.90, len(c_values)))
+
+    for color, c_value in zip(colors, c_values):
+
+        ref = freya_scan[c_value]
+
+        if np.isclose(c_value, 1.2):
+            linewidth = 5
+            linestyle = "-"
+            zorder = 6
+        else:
+            linewidth = 3
+            linestyle = "-"
+            zorder = 4
+
+        ax.plot(
+            ref["energy"],
+            ref["sigma"],
+            color=color,
+            linestyle=linestyle,
+            linewidth=linewidth,
+            label=rf"FREYA $c={c_value:.1f}$",
+            zorder=zorder,
+        )
+
+    errorbar_model(
+        ax,
+        "SCONE",
+        energies,
+        sigma,
+        xerr=energy_err,
+        yerr=sigma_err,
+        label="SCONE",
+        linestyle="none",
+        linewidth=2,
+        markersize=7,
+        capsize=4,
+        zorder=10,
+    )
+
+    ax.set_xlabel(
+        "Incident neutron energy (MeV)",
+        fontsize=PLOT_STYLE["label_size"],
+    )
+
+    ax.set_ylabel(
+        "Neutron multiplicity standard deviation",
+        fontsize=PLOT_STYLE["label_size"],
+    )
+
+    ax.set_xlim(0, 20.5)
+    ax.set_xticks([0, 5, 10, 15, 20])
+
+    ax.legend(
         fontsize=PLOT_STYLE["legend_size"],
+        loc="upper left",
+        frameon=False,
         handlelength=1.6,
         borderpad=0.2,
         labelspacing=0.4,
     )
 
-    # ------------------------------------------------------------
-    # Final formatting
-    # ------------------------------------------------------------
-
     polish_axes(ax)
-
-    ax.set_xlim(2.3, 4.1)
-    ax.set_ylim(0.7, 1.7)
-    ax.set_yticks([1.0, 1.2, 1.4, 1.6])
-    ax.set_xticks([2.5, 3.0, 3.5, 4.0])
-
     fig.tight_layout()
 
     return fig, ax

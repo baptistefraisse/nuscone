@@ -42,19 +42,67 @@ def load_references(reference_dir: str | Path) -> dict:
         "f4": factorial_moment_from_pnu(gef_pnu_values, 4),
     }
 
+    # FREYA
+
+    freya = _loadtxt(reference_dir / "freya" / "238U_nubar_sigma_FREYA.txt")
+    refs["FREYA"] = {
+        "energy": freya[:, 0],
+        "nubar": freya[:, 1],
+        "sigma": freya[:, 2],
+    }
+
+    freya_c_files = {
+        0.8: "238U_nubar_sigma_FREYA_c0p8.txt",
+        1.0: "238U_nubar_sigma_FREYA_c1p0.txt",
+        1.2: "238U_nubar_sigma_FREYA_c1p2.txt",
+        1.4: "238U_nubar_sigma_FREYA_c1p4.txt",
+        1.6: "238U_nubar_sigma_FREYA_c1p6.txt",
+    }
+
+    refs["FREYA_C_SCAN"] = {}
+
+    for c_value, filename in freya_c_files.items():
+        data = _loadtxt(reference_dir / "freya" / filename)
+
+        refs["FREYA_C_SCAN"][c_value] = {
+            "energy": data[:, 0],
+            "nubar": data[:, 1],
+            "sigma": data[:, 2],
+        }
+
+    freya_pnu = _loadtxt(reference_dir / "freya" / "FREYA_pnu.txt")
+    freya_energy_pnu = freya_pnu[:, 0]
+    freya_pnu_values = freya_pnu[:, 1:]
+
+    refs["FREYA_PNU"] = {
+        "energy": freya_energy_pnu,
+        "pnu": freya_pnu_values,
+        "f1": factorial_moment_from_pnu(freya_pnu_values, 1),
+        "f2": factorial_moment_from_pnu(freya_pnu_values, 2),
+        "f3": factorial_moment_from_pnu(freya_pnu_values, 3),
+        "f4": factorial_moment_from_pnu(freya_pnu_values, 4),
+    }
+
     # CGMF
 
-    cgmf = _loadtxt(reference_dir / "cgmf" / "238U_moments_CGMF.txt")
-    f1 = cgmf[:, 1]
-    f2 = cgmf[:, 2]
-    f3 = cgmf[:, 3]
+    cgmf = _loadtxt(reference_dir / "cgmf" / "238U_nubar_sigma_CGMF.txt")
     refs["CGMF"] = {
         "energy": cgmf[:, 0],
-        "nubar": f1,
-        "sigma": np.sqrt(f1 + f2 - f1**2),
-        "f1": f1,
-        "f2": f2,
-        "f3": f3,
+        "nubar": cgmf[:, 1],
+        "sigma": cgmf[:, 2],
+    }
+
+    cgmf_pnu = _loadtxt(reference_dir / "cgmf" / "CGMF_pnu.txt")
+    cgmf_energy_pnu = cgmf_pnu[:, 0]
+    cgmf_pnu_values = cgmf_pnu[:, 1:]
+
+    refs["CGMF_PNU"] = {
+        "energy": cgmf_energy_pnu,
+        "pnu": cgmf_pnu_values,
+        "f1": factorial_moment_from_pnu(cgmf_pnu_values, 1),
+        "f2": factorial_moment_from_pnu(cgmf_pnu_values, 2),
+        "f3": factorial_moment_from_pnu(cgmf_pnu_values, 3),
+        "f4": factorial_moment_from_pnu(cgmf_pnu_values, 4),
     }
 
     # JEFF 3.3
@@ -97,10 +145,30 @@ def load_references(reference_dir: str | Path) -> dict:
         "p1": 100.0 - multichance_gef[:, 1] - multichance_gef[:, 2],
     }
 
+    # Multi-chance probabilities: FREYA
+
+    multichance_freya = _loadtxt(
+        reference_dir / "freya" / "238U_multichance_FREYA.txt"
+    )
+
+    refs["FREYA_MULTICHANCE"] = {
+        "energy": multichance_freya[:, 0],
+        "p2": multichance_freya[:, 1],
+        "p3": multichance_freya[:, 2],
+        "p1": 100.0 - multichance_freya[:, 1] - multichance_freya[:, 2],
+    }
+
+    refs["GEF_MULTICHANCE"] = {
+        "energy": multichance_gef[:, 0],
+        "p2": multichance_gef[:, 1],
+        "p3": multichance_gef[:, 2],
+        "p1": 100.0 - multichance_gef[:, 1] - multichance_gef[:, 2],
+    }
+
     # Multi-chance probabilities: CGMF
 
     multichance_cgmf = _loadtxt(
-        reference_dir / "cgmf" / "multichance_cgmf.txt"
+        reference_dir / "cgmf" / "238U_multichance_CGMF.txt"
     )
 
     refs["CGMF_MULTICHANCE"] = {
